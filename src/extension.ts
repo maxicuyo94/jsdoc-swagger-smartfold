@@ -1,11 +1,18 @@
 import * as vscode from 'vscode';
-import { findSwaggerBlocks, validateSwagger, clearBlocksCache } from './swaggerUtils';
+import { findSwaggerBlocks, validateSwagger, clearBlocksCache, SwaggerBlock } from './swaggerUtils';
 import { activateDecorations, updateDecorations } from './decorator';
+import { activateCodeLens, SwaggerCodeLensProvider } from './codeLens';
+import { activateHoverProvider } from './hoverProvider';
+import { activateCodeActions } from './codeActions';
+import { activateStatusBar, updateStatusBar, disposeStatusBar } from './statusBar';
+import { exportCurrentFile, exportProject, copyBlockAsJson } from './exporter';
+import { showSwaggerPreview, disposePreview } from './preview';
 import {
   DIAGNOSTIC_COLLECTION_NAME,
   COMMANDS,
   isSupportedLanguage,
   configManager,
+  isFileExcluded,
 } from './constants';
 import { debounce } from './utils';
 
@@ -14,6 +21,7 @@ const VALIDATION_DEBOUNCE_MS = 300;
 const DECORATION_DEBOUNCE_MS = 150;
 
 let diagnosticCollection: vscode.DiagnosticCollection;
+let codeLensProvider: SwaggerCodeLensProvider;
 
 // Debounced functions (initialized in activate)
 let debouncedValidation: ReturnType<typeof debounce<(doc: vscode.TextDocument) => void>>;
@@ -30,6 +38,18 @@ export function activate(context: vscode.ExtensionContext): void {
   // Initialize decorations
   activateDecorations(context);
 
+  // Initialize CodeLens
+  codeLensProvider = activateCodeLens(context);
+
+  // Initialize Hover Provider
+  activateHoverProvider(context);
+
+  // Initialize Code Actions
+  activateCodeActions(context);
+
+  // Initialize Status Bar
+  activateStatusBar(context);
+
   // Create debounced functions
   debouncedValidation = debounce((doc: vscode.TextDocument) => {
     triggerValidation(doc);
@@ -39,12 +59,33 @@ export function activate(context: vscode.ExtensionContext): void {
     updateDecorations(editor);
   }, DECORATION_DEBOUNCE_MS);
 
-  // Register command: Manual fold
-  const foldCommand = vscode.commands.registerCommand(COMMANDS.FOLD_NOW, handleManualFold);
+  // Register commands
+  const commands = [
+    // Fold command
+    vscode.commands.registerCommand(COMMANDS.FOLD_NOW, handleManualFold),
+
+    // Unfold command
+    vscode.commands.registerCommand(COMMANDS.UNFOLD_NOW, handleManualUnfold),
+
+    // Toggle fold at cursor
+    vscode.commands.registerCommand(COMMANDS.TOGGLE_FOLD, handleToggleFold),
+
+    // Navigation commands
+    vscode.commands.registerCommand(COMMANDS.NEXT_BLOCK, handleNextBlock),
+    vscode.commands.registerCommand(COMMANDS.PREVIOUS_BLOCK, handlePreviousBlock),
+
+    // Export commands
+    vscode.commands.registerCommand(COMMANDS.EXPORT_FILE, exportCurrentFile),
+    vscode.commands.registerCommand(COMMANDS.EXPORT_PROJECT, exportProject),
+    vscode.commands.registerCommand(COMMANDS.COPY_AS_JSON, (block?: SwaggerBlock) => copyBlockAsJson(block)),
+
+    // Preview command
+    vscode.commands.registerCommand(COMMANDS.PREVIEW, () => showSwaggerPreview(context)),
+  ];
 
   // Event: Document opened
   const onOpen = vscode.workspace.onDidOpenTextDocument((doc) => {
-    if (isSupportedLanguage(doc.languageId)) {
+    if (shouldProcessDocument(doc)) {
       triggerValidation(doc);
     }
   });
@@ -52,7 +93,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // Event: Document changed
   const onChange = vscode.workspace.onDidChangeTextDocument((e) => {
     const doc = e.document;
-    if (!isSupportedLanguage(doc.languageId)) {
+    if (!shouldProcessDocument(doc)) {
       return;
     }
 
@@ -64,6 +105,12 @@ export function activate(context: vscode.ExtensionContext): void {
     if (editor?.document === doc) {
       debouncedDecoration(editor);
     }
+
+    // Update status bar
+    updateStatusBar();
+
+    // Refresh CodeLens
+    codeLensProvider.refresh();
   });
 
   // Event: Document closed (cleanup cache)
@@ -79,13 +126,14 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   });
 
-  context.subscriptions.push(foldCommand, onOpen, onChange, onClose, onEditorChange);
+  context.subscriptions.push(...commands, onOpen, onChange, onClose, onEditorChange);
 
   // Initial processing for active editor
   const activeEditor = vscode.window.activeTextEditor;
-  if (activeEditor && isSupportedLanguage(activeEditor.document.languageId)) {
+  if (activeEditor && shouldProcessDocument(activeEditor.document)) {
     triggerValidation(activeEditor.document);
     updateDecorations(activeEditor);
+    updateStatusBar();
 
     if (configManager.autoFold) {
       foldSwaggerBlocks(activeEditor).catch(console.error);
@@ -98,8 +146,30 @@ export function deactivate(): void {
   debouncedValidation?.cancel();
   debouncedDecoration?.cancel();
 
+  // Dispose status bar
+  disposeStatusBar();
+
+  // Dispose preview
+  disposePreview();
+
   // Clear cache
   clearBlocksCache();
+}
+
+/**
+ * Check if document should be processed (language supported and not excluded)
+ */
+function shouldProcessDocument(doc: vscode.TextDocument): boolean {
+  if (!isSupportedLanguage(doc.languageId)) {
+    return false;
+  }
+
+  const excludePatterns = configManager.exclude;
+  if (excludePatterns.length > 0 && isFileExcluded(doc.uri.fsPath, excludePatterns)) {
+    return false;
+  }
+
+  return true;
 }
 
 async function handleManualFold(): Promise<void> {
@@ -109,16 +179,149 @@ async function handleManualFold(): Promise<void> {
   }
 }
 
+async function handleManualUnfold(): Promise<void> {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor) {
+    return;
+  }
+
+  const document = editor.document;
+  if (!shouldProcessDocument(document)) {
+    return;
+  }
+
+  const blocks = findSwaggerBlocks(document);
+  if (blocks.length === 0) {
+    return;
+  }
+
+  // Create selections at the start of each block for unfolding
+  const selections = blocks.map(
+    (block) => new vscode.Selection(block.range.start, block.range.start),
+  );
+
+  const originalSelections = editor.selections;
+
+  try {
+    editor.selections = selections;
+    await vscode.commands.executeCommand('editor.unfold');
+  } finally {
+    editor.selections = originalSelections;
+  }
+}
+
+async function handleToggleFold(): Promise<void> {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor) {
+    return;
+  }
+
+  const document = editor.document;
+  if (!shouldProcessDocument(document)) {
+    return;
+  }
+
+  const position = editor.selection.active;
+  const blocks = findSwaggerBlocks(document);
+  const blockAtCursor = blocks.find((b) => b.range.contains(position));
+
+  if (!blockAtCursor) {
+    vscode.window.showInformationMessage('Cursor is not inside a Swagger block');
+    return;
+  }
+
+  const originalSelections = editor.selections;
+
+  try {
+    editor.selection = new vscode.Selection(blockAtCursor.range.start, blockAtCursor.range.start);
+    await vscode.commands.executeCommand('editor.toggleFold');
+  } finally {
+    editor.selections = originalSelections;
+  }
+}
+
+async function handleNextBlock(): Promise<void> {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor) {
+    return;
+  }
+
+  const document = editor.document;
+  if (!shouldProcessDocument(document)) {
+    return;
+  }
+
+  const position = editor.selection.active;
+  const blocks = findSwaggerBlocks(document);
+
+  if (blocks.length === 0) {
+    vscode.window.showInformationMessage('No Swagger blocks found');
+    return;
+  }
+
+  // Find next block after current position
+  const nextBlock = blocks.find((b) => b.range.start.line > position.line);
+
+  if (nextBlock) {
+    const newPosition = new vscode.Position(nextBlock.range.start.line, 0);
+    editor.selection = new vscode.Selection(newPosition, newPosition);
+    editor.revealRange(nextBlock.range, vscode.TextEditorRevealType.InCenter);
+  } else {
+    // Wrap to first block
+    const firstBlock = blocks[0];
+    const newPosition = new vscode.Position(firstBlock.range.start.line, 0);
+    editor.selection = new vscode.Selection(newPosition, newPosition);
+    editor.revealRange(firstBlock.range, vscode.TextEditorRevealType.InCenter);
+  }
+}
+
+async function handlePreviousBlock(): Promise<void> {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor) {
+    return;
+  }
+
+  const document = editor.document;
+  if (!shouldProcessDocument(document)) {
+    return;
+  }
+
+  const position = editor.selection.active;
+  const blocks = findSwaggerBlocks(document);
+
+  if (blocks.length === 0) {
+    vscode.window.showInformationMessage('No Swagger blocks found');
+    return;
+  }
+
+  // Find previous block before current position
+  const previousBlocks = blocks.filter((b) => b.range.start.line < position.line);
+  const previousBlock = previousBlocks[previousBlocks.length - 1];
+
+  if (previousBlock) {
+    const newPosition = new vscode.Position(previousBlock.range.start.line, 0);
+    editor.selection = new vscode.Selection(newPosition, newPosition);
+    editor.revealRange(previousBlock.range, vscode.TextEditorRevealType.InCenter);
+  } else {
+    // Wrap to last block
+    const lastBlock = blocks[blocks.length - 1];
+    const newPosition = new vscode.Position(lastBlock.range.start.line, 0);
+    editor.selection = new vscode.Selection(newPosition, newPosition);
+    editor.revealRange(lastBlock.range, vscode.TextEditorRevealType.InCenter);
+  }
+}
+
 async function handleActiveEditorChange(editor: vscode.TextEditor): Promise<void> {
   const doc = editor.document;
 
-  if (!isSupportedLanguage(doc.languageId)) {
+  if (!shouldProcessDocument(doc)) {
     return;
   }
 
   // Validate and update decorations
   triggerValidation(doc);
   updateDecorations(editor);
+  updateStatusBar();
 
   // Auto-fold if enabled
   if (configManager.autoFold) {
@@ -130,7 +333,7 @@ async function handleActiveEditorChange(editor: vscode.TextEditor): Promise<void
  * Validates the document and updates diagnostics
  */
 async function triggerValidation(document: vscode.TextDocument): Promise<void> {
-  if (!isSupportedLanguage(document.languageId)) {
+  if (!shouldProcessDocument(document)) {
     return;
   }
 
@@ -149,7 +352,7 @@ async function triggerValidation(document: vscode.TextDocument): Promise<void> {
 async function foldSwaggerBlocks(editor: vscode.TextEditor): Promise<void> {
   const document = editor.document;
 
-  if (!isSupportedLanguage(document.languageId)) {
+  if (!shouldProcessDocument(document)) {
     return;
   }
 

@@ -4,24 +4,76 @@
 [![Open VSX](https://img.shields.io/open-vsx/v/tu-publisher-id/jsdoc-swagger-smartfold?label=Open%20VSX)](https://open-vsx.org/extension/tu-publisher-id/jsdoc-swagger-smartfold)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A VS Code extension that automatically detects, folds, and validates `@swagger` blocks within JSDoc comments in JavaScript and TypeScript files.
+A VS Code extension that automatically detects, folds, validates, and provides rich features for `@swagger` and `@openapi` blocks within JSDoc comments in JavaScript and TypeScript files.
 
 ---
 
 ## Features
 
 ### 🔍 Auto-Detection & Folding
-Automatically detects JSDoc comments containing the `@swagger` tag and folds them when you open a file. This keeps your code clean and readable while keeping your API documentation close to the code.
+Automatically detects JSDoc comments containing the `@swagger` or `@openapi` tag and folds them when you open a file. This keeps your code clean and readable while keeping your API documentation close to the code.
 
 ### ✅ Validation
 Validates the content of your Swagger/OpenAPI definitions:
 *   **YAML Syntax Check**: Ensures valid YAML structure.
-*   **OpenAPI Schema Validation**: Checks against OpenAPI 3.0 specification (best effort for fragments).
+*   **OpenAPI Schema Validation**: Checks against OpenAPI 3.0/3.1 specification (best effort for fragments).
 *   **Error Reporting**: Displays errors and warnings directly in VS Code's "Problems" panel.
+*   **Configurable Severity**: Set validation errors as `error`, `warning`, or `info`.
 
-### 🛠 Manual Control
-*   **Command**: `Swagger SmartFold: Fold Swagger Blocks` (`swaggerFold.foldNow`) to manually fold all blocks in the current file.
-*   **Configuration**: Toggle auto-folding on/off.
+### 🏷️ CodeLens
+Inline information displayed above each Swagger block:
+*   **Endpoint Info**: Shows HTTP method and path (e.g., `GET /api/users`)
+*   **Parameters Count**: Number of parameters defined
+*   **Response Codes**: List of response status codes
+*   **Quick Actions**: Copy as JSON with one click
+
+### 💡 Hover Preview
+Hover over `@swagger` or `@openapi` tags to see a formatted preview:
+*   Summary and description
+*   Tags
+*   Parameters count
+*   Response codes
+*   YAML preview (truncated for large blocks)
+
+### 🔧 Quick Fixes
+Automatic code actions for common issues:
+*   Add default responses
+*   Add summary field
+*   Add operationId
+*   Fix invalid types
+
+### 📊 Status Bar
+*   Shows count of Swagger blocks in current file
+*   Click to fold all blocks
+
+### 🚀 Navigation
+*   **Next Block**: Jump to the next Swagger block
+*   **Previous Block**: Jump to the previous Swagger block
+*   **Toggle Fold**: Fold/unfold the block at cursor
+
+### 📤 Export
+*   **Export Current File**: Combine all Swagger blocks from current file into a single OpenAPI document
+*   **Export Project**: Scan entire project and export all Swagger blocks
+*   **Copy as JSON**: Copy current block as JSON to clipboard
+*   **Format Options**: Export as YAML or JSON
+
+### 👁️ Swagger UI Preview
+*   Live preview of your API documentation using Swagger UI
+*   Dark theme adapted to VS Code
+*   Opens in a side panel
+
+---
+
+## Supported Languages
+
+| Language | File Extensions |
+|----------|-----------------|
+| JavaScript | `.js` |
+| TypeScript | `.ts` |
+| JavaScript React | `.jsx` |
+| TypeScript React | `.tsx` |
+| Vue | `.vue` |
+| Svelte | `.svelte` |
 
 ---
 
@@ -49,8 +101,8 @@ code --install-extension tu-publisher-id.jsdoc-swagger-smartfold
 
 ## Usage
 
-1.  Open any `.js`, `.ts`, `.jsx`, or `.tsx` file.
-2.  Add a JSDoc block with `@swagger`:
+1.  Open any supported file (`.js`, `.ts`, `.jsx`, `.tsx`, `.vue`, `.svelte`).
+2.  Add a JSDoc block with `@swagger` or `@openapi`:
 
 ```javascript
 /**
@@ -59,6 +111,13 @@ code --install-extension tu-publisher-id.jsdoc-swagger-smartfold
  *   get:
  *     summary: Returns a list of users.
  *     description: Optional description.
+ *     tags:
+ *       - Users
+ *     parameters:
+ *       - name: limit
+ *         in: query
+ *         schema:
+ *           type: integer
  *     responses:
  *       200:
  *         description: A JSON array of user names
@@ -72,8 +131,62 @@ code --install-extension tu-publisher-id.jsdoc-swagger-smartfold
 app.get('/api/users', (req, res) => { ... });
 ```
 
+Or using `@openapi`:
+
+```javascript
+/**
+ * @openapi
+ * /api/products/{id}:
+ *   get:
+ *     summary: Get product by ID
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Product details
+ *       404:
+ *         description: Product not found
+ */
+app.get('/api/products/:id', (req, res) => { ... });
+```
+
 3.  The block will automatically fold (if enabled).
-4.  If there are syntax errors in your YAML or OpenAPI definition, they will appear in the Problems panel.
+4.  CodeLens will show endpoint info above the block.
+5.  Hover over `@swagger`/`@openapi` to see a preview.
+6.  If there are syntax errors, they will appear in the Problems panel with Quick Fix suggestions.
+
+---
+
+## Commands
+
+All commands are available via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`):
+
+| Command | Description | Keyboard Shortcut |
+|---------|-------------|-------------------|
+| `Swagger SmartFold: Fold Swagger Blocks` | Fold all Swagger blocks | `Ctrl+Alt+S F` |
+| `Swagger SmartFold: Unfold Swagger Blocks` | Unfold all Swagger blocks | `Ctrl+Alt+S U` |
+| `Swagger SmartFold: Toggle Fold at Cursor` | Toggle fold for block at cursor | `Ctrl+Alt+S T` |
+| `Swagger SmartFold: Go to Next Swagger Block` | Navigate to next block | `Ctrl+Alt+S ↓` |
+| `Swagger SmartFold: Go to Previous Swagger Block` | Navigate to previous block | `Ctrl+Alt+S ↑` |
+| `Swagger SmartFold: Export Swagger to File` | Export current file's blocks | - |
+| `Swagger SmartFold: Export All Project Swagger to File` | Export all project blocks | - |
+| `Swagger SmartFold: Copy Swagger Block as JSON` | Copy current block as JSON | - |
+| `Swagger SmartFold: Preview Swagger UI` | Open Swagger UI preview | `Ctrl+Alt+S P` |
+
+> **Note:** On macOS, use `Cmd` instead of `Ctrl`.
+
+---
+
+## Context Menu
+
+Right-click inside a supported file to access:
+*   Toggle Fold at Cursor
+*   Copy Swagger Block as JSON
+*   Preview Swagger UI
 
 ---
 
@@ -83,8 +196,56 @@ This extension contributes the following settings:
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
-| `swaggerFold.autoFold` | boolean | `true` | Auto-fold @swagger JSDoc blocks when opening a file |
+| `swaggerFold.autoFold` | boolean | `true` | Auto-fold @swagger/@openapi JSDoc blocks when opening a file |
 | `swaggerFold.highlight` | boolean | `true` | Enable/disable syntax highlighting for Swagger blocks |
+| `swaggerFold.exclude` | array | `[]` | Glob patterns for files/folders to exclude (e.g., `["**/test/**", "**/node_modules/**"]`) |
+| `swaggerFold.validationSeverity` | string | `"warning"` | Severity level for OpenAPI validation errors (`"error"`, `"warning"`, `"info"`) |
+| `swaggerFold.autoFoldDelay` | number | `300` | Delay in milliseconds before auto-folding blocks (0-5000) |
+| `swaggerFold.exportFormat` | string | `"yaml"` | Default format for exporting OpenAPI documents (`"yaml"`, `"json"`) |
+
+### Example Settings
+
+```json
+{
+  "swaggerFold.autoFold": true,
+  "swaggerFold.highlight": true,
+  "swaggerFold.exclude": [
+    "**/test/**",
+    "**/node_modules/**",
+    "**/*.spec.ts"
+  ],
+  "swaggerFold.validationSeverity": "warning",
+  "swaggerFold.autoFoldDelay": 500,
+  "swaggerFold.exportFormat": "yaml"
+}
+```
+
+---
+
+## Export Feature
+
+### Export Current File
+
+1. Open a file with Swagger blocks
+2. Run command `Swagger SmartFold: Export Swagger to File`
+3. Choose save location
+4. File will be created with all blocks merged into a valid OpenAPI document
+
+### Export Entire Project
+
+1. Run command `Swagger SmartFold: Export All Project Swagger to File`
+2. Extension will scan all supported files in the workspace
+3. Choose save location
+4. All Swagger blocks from the project will be merged into a single OpenAPI document
+
+### Output Format
+
+The exported document includes:
+*   OpenAPI 3.0.3 specification
+*   Auto-generated info section
+*   All paths merged from blocks
+*   Components/schemas if defined
+*   Tags collected from all endpoints
 
 ---
 
@@ -104,11 +265,18 @@ If you find this extension useful and want to support its development, consider 
 
 | Feature | FREE | PRO ($1) |
 |---------|:----:|:--------:|
-| Auto-fold @swagger blocks | ✅ | ✅ |
+| Auto-fold @swagger/@openapi blocks | ✅ | ✅ |
 | YAML syntax validation | ✅ | ✅ |
 | OpenAPI schema validation | ✅ | ✅ |
-| Manual fold command | ✅ | ✅ |
+| Manual fold/unfold commands | ✅ | ✅ |
 | Visual highlighting | ✅ | ✅ |
+| CodeLens with endpoint info | ✅ | ✅ |
+| Hover preview | ✅ | ✅ |
+| Quick Fixes | ✅ | ✅ |
+| Navigation commands | ✅ | ✅ |
+| Export to file | ✅ | ✅ |
+| Swagger UI preview | ✅ | ✅ |
+| Status bar indicator | ✅ | ✅ |
 | Priority support via email | ❌ | ✅ |
 | Early access to new features | ❌ | ✅ |
 | Name in supporters list | ❌ | ✅ |
@@ -157,6 +325,23 @@ Or in VS Code:
 | `npm run publish:vs` | Publish to VS Marketplace |
 | `npm run publish:ovsx` | Publish to Open VSX |
 | `npm run publish:all` | Publish to both marketplaces |
+
+### Project Structure
+
+```
+src/
+├── extension.ts      # Main extension entry point
+├── constants.ts      # Constants, commands, and configuration
+├── swaggerUtils.ts   # Swagger block detection and validation
+├── decorator.ts      # Visual decorations for blocks
+├── codeLens.ts       # CodeLens provider
+├── hoverProvider.ts  # Hover information provider
+├── codeActions.ts    # Quick Fix code actions
+├── statusBar.ts      # Status bar indicator
+├── exporter.ts       # Export functionality
+├── preview.ts        # Swagger UI preview webview
+└── utils.ts          # Utility functions
+```
 
 ---
 
