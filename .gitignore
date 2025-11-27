@@ -16,3 +16,15 @@ yarn-error.log*
 yarn.lock
 coverage
 .nyc_output
+
+# Credenciales locales (NO versionar)
+.local/
+
+# Archivos de entorno
+.env
+.env.local
+.env.*.local
+
+# Archivos del sistema
+Thumbs.db
+Desktop.ini

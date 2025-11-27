@@ -3,6 +3,31 @@
   "displayName": "JSDoc Swagger SmartFold",
   "description": "Auto-fold and validate @swagger JSDoc blocks in JavaScript/TypeScript files.",
   "version": "0.0.1",
+  "publisher": "tu-publisher-id",
+  "license": "MIT",
+  "icon": "images/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tu-usuario/jsdoc-swagger-smartfold.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tu-usuario/jsdoc-swagger-smartfold/issues"
+  },
+  "homepage": "https://github.com/tu-usuario/jsdoc-swagger-smartfold#readme",
+  "keywords": [
+    "swagger",
+    "openapi",
+    "jsdoc",
+    "fold",
+    "documentation",
+    "api",
+    "javascript",
+    "typescript"
+  ],
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
+  },
   "engines": {
     "vscode": "^1.80.0"
   },
@@ -43,12 +68,20 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "npm run esbuild-base -- --production",
+    "esbuild-base": "node esbuild.js",
+    "esbuild": "npm run esbuild-base -- --sourcemap",
+    "esbuild-watch": "npm run esbuild-base -- --sourcemap --watch",
     "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
+    "watch": "npm run esbuild-watch",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
-    "test": "node ./out/test/runTest.js"
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package",
+    "publish:vs": "vsce publish",
+    "publish:ovsx": "ovsx publish",
+    "publish:all": "npm run publish:vs && npm run publish:ovsx",
+    "release": "node scripts/release.js"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
@@ -57,10 +90,13 @@
     "@types/vscode": "^1.80.0",
     "@typescript-eslint/eslint-plugin": "^8.48.0",
     "@typescript-eslint/parser": "^8.48.0",
+    "@vscode/vsce": "^3.2.1",
+    "esbuild": "^0.27.0",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",
     "globals": "^16.5.0",
+    "ovsx": "^0.9.5",
     "prettier": "^3.7.1",
     "typescript": "^5.3.3",
     "typescript-eslint": "^8.48.0"
