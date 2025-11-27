@@ -110,11 +110,16 @@ async function validateBlock(block: SwaggerBlock): Promise<vscode.Diagnostic | n
   try {
     parsedYaml = yaml.load(block.yamlContent);
   } catch (e: unknown) {
-    if (e && typeof e === 'object' && 'mark' in e && typeof (e as any).mark === 'object') {
-      const mark = (e as any).mark;
-      const errorLine = block.contentStartLine + (mark.line || 0);
+    const yamlError = e as { mark?: { line?: number }; message?: string };
+    if (
+      yamlError &&
+      typeof yamlError === 'object' &&
+      yamlError.mark &&
+      typeof yamlError.mark === 'object'
+    ) {
+      const errorLine = block.contentStartLine + (yamlError.mark.line || 0);
       const range = new vscode.Range(errorLine, 0, errorLine, 100);
-      const message = (e as any).message || 'Unknown YAML error';
+      const message = yamlError.message || 'Unknown YAML error';
 
       const diagnostic = new vscode.Diagnostic(
         range,
@@ -145,6 +150,7 @@ async function validateBlock(block: SwaggerBlock): Promise<vscode.Diagnostic | n
   }
 
   try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await SwaggerParser.validate(docToValidate as any);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Invalid OpenAPI definition';
