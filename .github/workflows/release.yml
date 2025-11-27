@@ -1,0 +1,160 @@
+name: Release Extension
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and Publish Extension
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout del código
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 2. Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # 3. Instalar dependencias
+      - name: Install dependencies
+        run: npm ci
+
+      # 4. Extraer información de versión del tag
+      - name: Get version from tag
+        id: version
+        run: |
+          TAG_VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$TAG_VERSION" >> $GITHUB_OUTPUT
+          echo "Release version: $TAG_VERSION"
+
+      # 5. Verificar que la versión del tag coincide con package.json
+      - name: Verify version match
+        run: |
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          TAG_VERSION=${{ steps.version.outputs.version }}
+          if [ "$PACKAGE_VERSION" != "$TAG_VERSION" ]; then
+            echo "Error: La versión del tag ($TAG_VERSION) no coincide con package.json ($PACKAGE_VERSION)"
+            exit 1
+          fi
+          echo "Versión verificada: $PACKAGE_VERSION"
+
+      # 6. Verificar el contenido del paquete
+      - name: Verify package contents
+        run: |
+          echo "Archivos que se incluirán en el paquete:"
+          npx vsce ls
+
+      # 7. Empaquetar la extensión
+      - name: Package extension
+        run: |
+          npx vsce package
+          echo "VSIX_FILE=$(ls *.vsix)" >> $GITHUB_ENV
+
+      # 8. Mostrar información del paquete
+      - name: Show package info
+        run: |
+          ls -la *.vsix
+          echo "Archivo generado: ${{ env.VSIX_FILE }}"
+
+      # 9. Publicar en Visual Studio Marketplace
+      - name: Publish to VS Marketplace
+        id: publish-vs
+        continue-on-error: true
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_TOKEN }}
+        run: |
+          echo "Publicando en Visual Studio Marketplace..."
+          npx vsce publish -p $VSCE_PAT
+          echo "status=success" >> $GITHUB_OUTPUT
+
+      # 10. Verificar resultado de VS Marketplace
+      - name: Check VS Marketplace publish result
+        if: steps.publish-vs.outcome == 'failure'
+        run: |
+          echo "::warning::La publicación en VS Marketplace falló. Verifica el token VSCE_TOKEN."
+
+      # 11. Publicar en Open VSX
+      - name: Publish to Open VSX
+        id: publish-ovsx
+        continue-on-error: true
+        env:
+          OPENVSX_TOKEN: ${{ secrets.OPENVSX_TOKEN }}
+        run: |
+          echo "Publicando en Open VSX..."
+          npx ovsx publish ${{ env.VSIX_FILE }} -p $OPENVSX_TOKEN
+          echo "status=success" >> $GITHUB_OUTPUT
+
+      # 12. Verificar resultado de Open VSX
+      - name: Check Open VSX publish result
+        if: steps.publish-ovsx.outcome == 'failure'
+        run: |
+          echo "::warning::La publicación en Open VSX falló. Verifica el token OPENVSX_TOKEN."
+
+      # 13. Crear Release en GitHub
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Release v${{ steps.version.outputs.version }}
+          body: |
+            ## JSDoc Swagger SmartFold v${{ steps.version.outputs.version }}
+
+            ### Instalación
+
+            **Visual Studio Marketplace:**
+            ```
+            ext install tu-publisher-id.jsdoc-swagger-smartfold
+            ```
+
+            **Open VSX:**
+            ```
+            ext install tu-publisher-id.jsdoc-swagger-smartfold
+            ```
+
+            **Instalación manual:**
+            Descarga el archivo `.vsix` adjunto y ejecuta:
+            ```bash
+            code --install-extension ${{ env.VSIX_FILE }}
+            ```
+
+            ### Estado de publicación
+            - VS Marketplace: ${{ steps.publish-vs.outcome == 'success' && '✅ Publicado' || '⚠️ Pendiente/Error' }}
+            - Open VSX: ${{ steps.publish-ovsx.outcome == 'success' && '✅ Publicado' || '⚠️ Pendiente/Error' }}
+
+            ---
+            Ver [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) para detalles de los cambios.
+          files: ${{ env.VSIX_FILE }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+
+      # 14. Resumen final
+      - name: Summary
+        run: |
+          echo "## Resumen de Release" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Destino | Estado |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| VS Marketplace | ${{ steps.publish-vs.outcome == 'success' && '✅ Éxito' || '❌ Error' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Open VSX | ${{ steps.publish-ovsx.outcome == 'success' && '✅ Éxito' || '❌ Error' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| GitHub Release | ✅ Creado |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Archivo:** \`${{ env.VSIX_FILE }}\`" >> $GITHUB_STEP_SUMMARY
+
+      # 15. Fallar si ambas publicaciones fallaron
+      - name: Check overall status
+        if: steps.publish-vs.outcome == 'failure' && steps.publish-ovsx.outcome == 'failure'
+        run: |
+          echo "::error::Ambas publicaciones (VS Marketplace y Open VSX) fallaron."
+          exit 1

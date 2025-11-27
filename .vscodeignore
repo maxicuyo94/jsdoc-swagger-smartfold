@@ -1,0 +1,77 @@
+# Archivos y carpetas a excluir del paquete .vsix
+# Esto reduce el tamaño del paquete y mejora los tiempos de instalación
+
+# Código fuente (solo se necesita el código compilado en /out)
+src/**
+**/*.ts
+!out/**/*.js
+
+# Configuración de desarrollo
+.vscode/**
+.vscode-test/**
+.github/**
+.local/**
+
+# Archivos de configuración de desarrollo
+tsconfig.json
+esbuild.js
+eslint.config.mjs
+.eslintrc*
+.prettierrc*
+.editorconfig
+
+# Dependencias de desarrollo (no se necesitan en runtime)
+node_modules/**
+
+# Archivos de test
+**/test/**
+**/*.test.js
+**/*.spec.js
+**/runTest.js
+
+# Documentación de desarrollo
+TESTING_GUIDE.md
+CONTRIBUTING.md
+.local/**
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Archivos de log
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Archivos de cobertura
+coverage/**
+.nyc_output/**
+
+# Archivos temporales
+*.tmp
+*.temp
+*.bak
+
+# Git
+.git/**
+.gitignore
+.gitattributes
+
+# Otros archivos de configuración
+.env
+.env.*
+*.vsix
+
+# Scripts de desarrollo (no necesarios en el paquete final)
+scripts/**
+
+# Archivos de lock (no necesarios para extensiones)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Plan files
+*.plan.md
+

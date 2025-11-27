@@ -1,42 +1,80 @@
 import * as vscode from 'vscode';
 import * as yaml from 'js-yaml';
 import SwaggerParser from '@apidevtools/swagger-parser';
+import { DIAGNOSTICS_SOURCE } from './constants';
+import { DocumentCache } from './utils';
 
 export interface SwaggerBlock {
   range: vscode.Range;
   yamlContent: string;
-  contentStartLine: number; // Relative to the document, line number where YAML starts
+  /** Line number where YAML content starts (relative to document) */
+  contentStartLine: number;
 }
 
-// Regex to match JSDoc blocks: /** ... */
-// We use [\s\S]*? for non-greedy match across lines
+interface YamlError {
+  mark?: { line?: number };
+  message?: string;
+}
+
+// Pre-compiled regex for better performance
 const JS_DOC_REGEX = /\/\*\*([\s\S]*?)\*\//g;
+const SWAGGER_TAG = '@swagger';
+const CLOSING_COMMENT_REGEX = /\*\/$/;
+const LEADING_ASTERISK_REGEX = /^\s*\*\s?/;
+
+// Cache for parsed blocks
+const blocksCache = new DocumentCache<SwaggerBlock[]>(10);
 
 /**
  * Finds all JSDoc blocks containing @swagger in the document.
+ * Results are cached per document version for performance.
  */
 export function findSwaggerBlocks(document: vscode.TextDocument): SwaggerBlock[] {
+  const uri = document.uri.toString();
+  const version = document.version;
+
+  // Check cache first
+  const cached = blocksCache.get(uri, version);
+  if (cached) {
+    return cached;
+  }
+
   const text = document.getText();
   const blocks: SwaggerBlock[] = [];
 
-  let match;
-  while ((match = JS_DOC_REGEX.exec(text)) !== null) {
-    const fullComment = match[0];
-    const innerContent = match[1];
-    const startIndex = match.index;
+  // Reset regex lastIndex for reuse
+  JS_DOC_REGEX.lastIndex = 0;
 
-    // Check if @swagger is present
-    if (!innerContent.includes('@swagger')) {
+  let match: RegExpExecArray | null;
+  while ((match = JS_DOC_REGEX.exec(text)) !== null) {
+    const innerContent = match[1];
+
+    // Quick check before expensive processing
+    if (!innerContent.includes(SWAGGER_TAG)) {
       continue;
     }
 
-    const result = processCommentBlock(document, fullComment, startIndex);
-    if (result) {
-      blocks.push(result);
+    const block = processCommentBlock(document, match[0], match.index);
+    if (block) {
+      blocks.push(block);
     }
   }
 
+  // Cache the result
+  blocksCache.set(uri, version, blocks);
+
   return blocks;
+}
+
+/**
+ * Clear cache for a specific document or all documents
+ */
+export function clearBlocksCache(uri?: string): void {
+  if (uri) {
+    blocksCache.delete(uri);
+  } else {
+    blocksCache.clear();
+  }
 }
 
 function processCommentBlock(
@@ -49,7 +87,6 @@ function processCommentBlock(
   const endPos = document.positionAt(endIndex);
   const range = new vscode.Range(startPos, endPos);
 
-  // Extract content after @swagger
   const lines = fullComment.split(/\r?\n/);
   const yamlLines: string[] = [];
   let swaggerFound = false;
@@ -59,7 +96,7 @@ function processCommentBlock(
     const line = lines[i];
 
     if (!swaggerFound) {
-      if (line.includes('@swagger')) {
+      if (line.includes(SWAGGER_TAG)) {
         swaggerFound = true;
         yamlStartLineOffset = i + 1;
       }
@@ -70,38 +107,35 @@ function processCommentBlock(
 
     // Remove closing */ if it's the last line
     if (i === lines.length - 1) {
-      cleanLine = cleanLine.replace(/\*\/$/, '');
+      cleanLine = cleanLine.replace(CLOSING_COMMENT_REGEX, '');
     }
 
-    // Remove leading whitespace and *
-    cleanLine = cleanLine.replace(/^\s*\*\s?/, '');
+    // Remove leading whitespace and asterisk
+    cleanLine = cleanLine.replace(LEADING_ASTERISK_REGEX, '');
 
     yamlLines.push(cleanLine);
   }
 
-  const contentStartLine = startPos.line + yamlStartLineOffset;
-
   return {
     range,
     yamlContent: yamlLines.join('\n'),
-    contentStartLine,
+    contentStartLine: startPos.line + yamlStartLineOffset,
   };
 }
 
 /**
- * Validates YAML syntax and basic OpenAPI structure.
+ * Validates YAML syntax and basic OpenAPI structure for all blocks.
  */
 export async function validateSwagger(blocks: SwaggerBlock[]): Promise<vscode.Diagnostic[]> {
-  const diagnostics: vscode.Diagnostic[] = [];
-
-  for (const block of blocks) {
-    const result = await validateBlock(block);
-    if (result) {
-      diagnostics.push(result);
-    }
+  if (blocks.length === 0) {
+    return [];
   }
 
-  return diagnostics;
+  // Validate all blocks in parallel for better performance
+  const results = await Promise.all(blocks.map(validateBlock));
+
+  // Filter out null results
+  return results.filter((d): d is vscode.Diagnostic => d !== null);
 }
 
 async function validateBlock(block: SwaggerBlock): Promise<vscode.Diagnostic | null> {
@@ -110,29 +144,10 @@ async function validateBlock(block: SwaggerBlock): Promise<vscode.Diagnostic | n
   try {
     parsedYaml = yaml.load(block.yamlContent);
   } catch (e: unknown) {
-    const yamlError = e as { mark?: { line?: number }; message?: string };
-    if (
-      yamlError &&
-      typeof yamlError === 'object' &&
-      yamlError.mark &&
-      typeof yamlError.mark === 'object'
-    ) {
-      const errorLine = block.contentStartLine + (yamlError.mark.line || 0);
-      const range = new vscode.Range(errorLine, 0, errorLine, 100);
-      const message = yamlError.message || 'Unknown YAML error';
-
-      const diagnostic = new vscode.Diagnostic(
-        range,
-        `YAML Syntax Error: ${message}`,
-        vscode.DiagnosticSeverity.Error,
-      );
-      diagnostic.source = 'JSDoc Swagger';
-      return diagnostic;
-    }
-    return null;
+    return createYamlErrorDiagnostic(block, e as YamlError);
   }
 
-  // If empty or null, skip
+  // Skip empty content
   if (!parsedYaml) {
     return null;
   }
@@ -141,9 +156,8 @@ async function validateBlock(block: SwaggerBlock): Promise<vscode.Diagnostic | n
   const docToValidate = prepareOpenApiDoc(parsedYaml);
 
   if (!docToValidate) {
-    const range = new vscode.Range(block.contentStartLine, 0, block.contentStartLine, 100);
     return new vscode.Diagnostic(
-      range,
+      new vscode.Range(block.contentStartLine, 0, block.contentStartLine, 100),
       'Swagger content must be an object (e.g. paths).',
       vscode.DiagnosticSeverity.Error,
     );
@@ -153,19 +167,44 @@ async function validateBlock(block: SwaggerBlock): Promise<vscode.Diagnostic | n
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await SwaggerParser.validate(docToValidate as any);
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Invalid OpenAPI definition';
-    const range = new vscode.Range(block.contentStartLine, 0, block.range.end.line, 0);
-
-    const diagnostic = new vscode.Diagnostic(
-      range,
-      `OpenAPI Validation Error: ${message}`,
-      vscode.DiagnosticSeverity.Warning,
-    );
-    diagnostic.source = 'JSDoc Swagger';
-    return diagnostic;
+    return createOpenApiErrorDiagnostic(block, err);
   }
 
   return null;
+}
+
+function createYamlErrorDiagnostic(
+  block: SwaggerBlock,
+  error: YamlError,
+): vscode.Diagnostic | null {
+  if (!error?.mark) {
+    return null;
+  }
+
+  const errorLine = block.contentStartLine + (error.mark.line ?? 0);
+  const range = new vscode.Range(errorLine, 0, errorLine, 100);
+  const message = error.message ?? 'Unknown YAML error';
+
+  const diagnostic = new vscode.Diagnostic(
+    range,
+    `YAML Syntax Error: ${message}`,
+    vscode.DiagnosticSeverity.Error,
+  );
+  diagnostic.source = DIAGNOSTICS_SOURCE;
+  return diagnostic;
+}
+
+function createOpenApiErrorDiagnostic(block: SwaggerBlock, err: unknown): vscode.Diagnostic {
+  const message = err instanceof Error ? err.message : 'Invalid OpenAPI definition';
+  const range = new vscode.Range(block.contentStartLine, 0, block.range.end.line, 0);
+
+  const diagnostic = new vscode.Diagnostic(
+    range,
+    `OpenAPI Validation Error: ${message}`,
+    vscode.DiagnosticSeverity.Warning,
+  );
+  diagnostic.source = DIAGNOSTICS_SOURCE;
+  return diagnostic;
 }
 
 function prepareOpenApiDoc(parsedYaml: unknown): Record<string, unknown> | null {
@@ -175,11 +214,12 @@ function prepareOpenApiDoc(parsedYaml: unknown): Record<string, unknown> | null 
 
   const doc = parsedYaml as Record<string, unknown>;
 
+  // Already a complete OpenAPI document
   if (doc.openapi || doc.swagger) {
     return doc;
   }
 
-  // Wrap fragment
+  // Wrap fragment in minimal OpenAPI structure
   return {
     openapi: '3.0.0',
     info: {

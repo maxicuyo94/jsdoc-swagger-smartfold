@@ -1,12 +1,17 @@
 import * as vscode from 'vscode';
 import { findSwaggerBlocks, SwaggerBlock } from './swaggerUtils';
+import { isSupportedLanguage, configManager } from './constants';
 
+// Decoration types (initialized once)
 let blockDecorationType: vscode.TextEditorDecorationType;
 let keyDecorationType: vscode.TextEditorDecorationType;
 let valueDecorationType: vscode.TextEditorDecorationType;
 
-export function activateDecorations(context: vscode.ExtensionContext) {
-  // 1. Block Background & Border
+// Pre-compiled regex for YAML key-value parsing
+const YAML_KEY_VALUE_REGEX = /^(\s*\*\s*)?([\w\-./'"]+):(.*)$/;
+
+export function activateDecorations(context: vscode.ExtensionContext): void {
+  // Block background & border
   blockDecorationType = vscode.window.createTextEditorDecorationType({
     backgroundColor: new vscode.ThemeColor('editor.hoverHighlightBackground'),
     isWholeLine: true,
@@ -15,44 +20,65 @@ export function activateDecorations(context: vscode.ExtensionContext) {
     borderColor: new vscode.ThemeColor('textLink.foreground'),
   });
 
-  // 2. YAML Keys
+  // YAML keys (bold)
   keyDecorationType = vscode.window.createTextEditorDecorationType({
-    color: new vscode.ThemeColor('entity.name.tag'),
+    color: new vscode.ThemeColor('editor.foreground'),
     fontWeight: 'bold',
   });
 
-  // 3. YAML Values
+  // YAML values (muted)
   valueDecorationType = vscode.window.createTextEditorDecorationType({
-    color: new vscode.ThemeColor('string.quoted.double'),
+    color: new vscode.ThemeColor('descriptionForeground'),
   });
 
   context.subscriptions.push(blockDecorationType, keyDecorationType, valueDecorationType);
 }
 
-export function updateDecorations(editor: vscode.TextEditor) {
+export function updateDecorations(editor: vscode.TextEditor): void {
   if (!editor) {
     return;
   }
 
-  const config = vscode.workspace.getConfiguration('swaggerFold');
-  const shouldHighlight = config.get<boolean>('highlight', true);
+  const document = editor.document;
 
-  if (!shouldHighlight) {
-    editor.setDecorations(blockDecorationType, []);
-    editor.setDecorations(keyDecorationType, []);
-    editor.setDecorations(valueDecorationType, []);
+  // Skip unsupported languages
+  if (!isSupportedLanguage(document.languageId)) {
     return;
   }
 
-  const document = editor.document;
-  // Only process supported languages to avoid unnecessary work
-  const supportedLanguages = ['javascript', 'typescript', 'javascriptreact', 'typescriptreact'];
-  if (!supportedLanguages.includes(document.languageId)) {
+  // Check if highlighting is enabled
+  if (!configManager.highlight) {
+    clearDecorations(editor);
     return;
   }
 
   const blocks = findSwaggerBlocks(document);
 
+  if (blocks.length === 0) {
+    clearDecorations(editor);
+    return;
+  }
+
+  const { blockRanges, keyRanges, valueRanges } = parseAllBlocks(document, blocks);
+
+  editor.setDecorations(blockDecorationType, blockRanges);
+  editor.setDecorations(keyDecorationType, keyRanges);
+  editor.setDecorations(valueDecorationType, valueRanges);
+}
+
+function clearDecorations(editor: vscode.TextEditor): void {
+  editor.setDecorations(blockDecorationType, []);
+  editor.setDecorations(keyDecorationType, []);
+  editor.setDecorations(valueDecorationType, []);
+}
+
+interface ParsedRanges {
+  blockRanges: vscode.Range[];
+  keyRanges: vscode.Range[];
+  valueRanges: vscode.Range[];
+}
+
+function parseAllBlocks(document: vscode.TextDocument, blocks: SwaggerBlock[]): ParsedRanges {
   const blockRanges: vscode.Range[] = [];
   const keyRanges: vscode.Range[] = [];
   const valueRanges: vscode.Range[] = [];
@@ -62,9 +88,7 @@ export function updateDecorations(editor: vscode.TextEditor) {
     parseBlockLines(document, block, keyRanges, valueRanges);
   }
 
-  editor.setDecorations(blockDecorationType, blockRanges);
-  editor.setDecorations(keyDecorationType, keyRanges);
-  editor.setDecorations(valueDecorationType, valueRanges);
+  return { blockRanges, keyRanges, valueRanges };
 }
 
 function parseBlockLines(
@@ -72,45 +96,34 @@ function parseBlockLines(
   block: SwaggerBlock,
   keyRanges: vscode.Range[],
   valueRanges: vscode.Range[],
-) {
+): void {
   const startLine = block.contentStartLine;
-  // We stop before the last line if it only contains */
-  const endLine = block.range.end.line;
+  const endLine = Math.min(block.range.end.line, document.lineCount - 1);
 
-  // Regex to capture key and value, ignoring JSDoc asterisk
-  // Matches: [optional whitespace*whitespace] [key] : [value]
-  const regex = /^(\s*\*\s*)?([\w\-./'"]+):(.*)$/;
+  for (let lineNum = startLine; lineNum <= endLine; lineNum++) {
+    const line = document.lineAt(lineNum);
+    const match = YAML_KEY_VALUE_REGEX.exec(line.text);
 
-  for (let i = startLine; i <= endLine; i++) {
-    if (i >= document.lineCount) break;
+    if (!match) {
+      continue;
+    }
 
-    const line = document.lineAt(i);
-    const text = line.text;
+    const prefix = match[1] ?? '';
+    const key = match[2];
+    const valueWithWhitespace = match[3] ?? '';
 
-    // Use exec instead of match
-    const match = regex.exec(text);
+    // Calculate key range
+    const keyStart = (match.index ?? 0) + prefix.length;
+    const keyEnd = keyStart + key.length;
+    keyRanges.push(new vscode.Range(lineNum, keyStart, lineNum, keyEnd));
 
-    if (match) {
-      const prefix = match[1] || '';
-      const key = match[2];
-      const valueWithWhitespace = match[3] || '';
-
-      // Key Range
-      const keyStart = (match.index || 0) + prefix.length;
-      const keyEnd = keyStart + key.length;
-      keyRanges.push(new vscode.Range(i, keyStart, i, keyEnd));
-
-      // Value Range (Trim whitespace)
-      const trimmedValue = valueWithWhitespace.trim();
-      if (trimmedValue.length > 0) {
-        // Calculate where the trimmed value starts
-        // valueWithWhitespace includes leading whitespace after colon
-        const leadingSpaces = valueWithWhitespace.indexOf(trimmedValue);
-        const valueStart = keyEnd + 1 + leadingSpaces; // +1 for the colon
-        const valueEnd = valueStart + trimmedValue.length;
-
-        valueRanges.push(new vscode.Range(i, valueStart, i, valueEnd));
-      }
+    // Calculate value range (trimmed)
+    const trimmedValue = valueWithWhitespace.trim();
+    if (trimmedValue.length > 0) {
+      const leadingSpaces = valueWithWhitespace.indexOf(trimmedValue);
+      const valueStart = keyEnd + 1 + leadingSpaces; // +1 for colon
+      const valueEnd = valueStart + trimmedValue.length;
+      valueRanges.push(new vscode.Range(lineNum, valueStart, lineNum, valueEnd));
     }
   }
 }
