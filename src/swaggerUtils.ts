@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as yaml from 'js-yaml';
 import SwaggerParser from '@apidevtools/swagger-parser';
-import { DIAGNOSTICS_SOURCE } from './constants';
+import { DIAGNOSTICS_SOURCE, SWAGGER_TAGS, HTTP_METHODS, configManager } from './constants';
 import { DocumentCache } from './utils';
 
 export interface SwaggerBlock {
@@ -9,6 +9,18 @@ export interface SwaggerBlock {
   yamlContent: string;
   /** Line number where YAML content starts (relative to document) */
   contentStartLine: number;
+  /** Parsed endpoint info for display */
+  endpointInfo?: EndpointInfo;
+}
+
+export interface EndpointInfo {
+  method: string;
+  path: string;
+  summary?: string;
+  description?: string;
+  tags?: string[];
+  parameters?: number;
+  responses?: string[];
 }
 
 interface YamlError {
@@ -18,7 +30,6 @@ interface YamlError {
 
 // Pre-compiled regex for better performance
 const JS_DOC_REGEX = /\/\*\*([\s\S]*?)\*\//g;
-const SWAGGER_TAG = '@swagger';
 const CLOSING_COMMENT_REGEX = /\*\/$/;
 const LEADING_ASTERISK_REGEX = /^\s*\*\s?/;
 
@@ -26,7 +37,26 @@ const LEADING_ASTERISK_REGEX = /^\s*\*\s?/;
 const blocksCache = new DocumentCache<SwaggerBlock[]>(10);
 
 /**
- * Finds all JSDoc blocks containing @swagger in the document.
+ * Check if content contains any swagger/openapi tag
+ */
+function containsSwaggerTag(content: string): boolean {
+  return SWAGGER_TAGS.some((tag) => content.includes(tag));
+}
+
+/**
+ * Find which swagger tag is in the line
+ */
+function findSwaggerTagInLine(line: string): string | null {
+  for (const tag of SWAGGER_TAGS) {
+    if (line.includes(tag)) {
+      return tag;
+    }
+  }
+  return null;
+}
+
+/**
+ * Finds all JSDoc blocks containing @swagger or @openapi in the document.
  * Results are cached per document version for performance.
  */
 export function findSwaggerBlocks(document: vscode.TextDocument): SwaggerBlock[] {
@@ -49,8 +79,8 @@ export function findSwaggerBlocks(document: vscode.TextDocument): SwaggerBlock[]
   while ((match = JS_DOC_REGEX.exec(text)) !== null) {
     const innerContent = match[1];
 
-    // Quick check before expensive processing
-    if (!innerContent.includes(SWAGGER_TAG)) {
+    // Quick check before expensive processing - supports both @swagger and @openapi
+    if (!containsSwaggerTag(innerContent)) {
       continue;
     }
 
@@ -96,7 +126,8 @@ function processCommentBlock(
     const line = lines[i];
 
     if (!swaggerFound) {
-      if (line.includes(SWAGGER_TAG)) {
+      // Check for any swagger tag (@swagger or @openapi)
+      if (findSwaggerTagInLine(line)) {
         swaggerFound = true;
         yamlStartLineOffset = i + 1;
       }
@@ -116,11 +147,87 @@ function processCommentBlock(
     yamlLines.push(cleanLine);
   }
 
+  const yamlContent = yamlLines.join('\n');
+  const endpointInfo = extractEndpointInfo(yamlContent);
+
   return {
     range,
-    yamlContent: yamlLines.join('\n'),
+    yamlContent,
     contentStartLine: startPos.line + yamlStartLineOffset,
+    endpointInfo,
   };
+}
+
+/**
+ * Extract endpoint information from YAML content for display
+ */
+export function extractEndpointInfo(yamlContent: string): EndpointInfo | undefined {
+  try {
+    const parsed = yaml.load(yamlContent) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== 'object') {
+      return undefined;
+    }
+
+    // Find the path and method
+    for (const [key, value] of Object.entries(parsed)) {
+      if (key.startsWith('/') && typeof value === 'object' && value !== null) {
+        // This is a path definition
+        const pathDef = value as Record<string, unknown>;
+        for (const method of HTTP_METHODS) {
+          if (pathDef[method] && typeof pathDef[method] === 'object') {
+            const methodDef = pathDef[method] as Record<string, unknown>;
+            return {
+              method: method.toUpperCase(),
+              path: key,
+              summary: methodDef.summary as string | undefined,
+              description: methodDef.description as string | undefined,
+              tags: methodDef.tags as string[] | undefined,
+              parameters: Array.isArray(methodDef.parameters) ? methodDef.parameters.length : 0,
+              responses: methodDef.responses ? Object.keys(methodDef.responses as object) : [],
+            };
+          }
+        }
+      }
+    }
+
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Parse YAML content safely
+ */
+export function parseYamlContent(yamlContent: string): Record<string, unknown> | null {
+  try {
+    const parsed = yaml.load(yamlContent);
+    if (parsed && typeof parsed === 'object') {
+      return parsed as Record<string, unknown>;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Convert YAML to JSON string
+ */
+export function yamlToJson(yamlContent: string): string | null {
+  try {
+    const parsed = yaml.load(yamlContent);
+    return JSON.stringify(parsed, null, 2);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Convert parsed object to YAML string
+ */
+export function objectToYaml(obj: unknown): string {
+  return yaml.dump(obj, { indent: 2, lineWidth: -1 });
 }
 
 /**
@@ -198,10 +305,18 @@ function createOpenApiErrorDiagnostic(block: SwaggerBlock, err: unknown): vscode
   const message = err instanceof Error ? err.message : 'Invalid OpenAPI definition';
   const range = new vscode.Range(block.contentStartLine, 0, block.range.end.line, 0);
 
+  // Get configured severity
+  const severityMap: Record<string, vscode.DiagnosticSeverity> = {
+    error: vscode.DiagnosticSeverity.Error,
+    warning: vscode.DiagnosticSeverity.Warning,
+    info: vscode.DiagnosticSeverity.Information,
+  };
+  const severity = severityMap[configManager.validationSeverity] ?? vscode.DiagnosticSeverity.Warning;
+
   const diagnostic = new vscode.Diagnostic(
     range,
     `OpenAPI Validation Error: ${message}`,
-    vscode.DiagnosticSeverity.Warning,
+    severity,
   );
   diagnostic.source = DIAGNOSTICS_SOURCE;
   return diagnostic;

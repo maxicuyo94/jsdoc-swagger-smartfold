@@ -1,7 +1,7 @@
 {
   "name": "jsdoc-swagger-smartfold",
   "displayName": "JSDoc Swagger SmartFold",
-  "description": "Auto-fold and validate @swagger JSDoc blocks in JavaScript/TypeScript files.",
+  "description": "Auto-fold and validate @swagger/@openapi JSDoc blocks in JavaScript/TypeScript files.",
   "version": "0.0.1",
   "publisher": "tu-publisher-id",
   "license": "MIT",
@@ -40,7 +40,9 @@
     "onLanguage:javascript",
     "onLanguage:typescript",
     "onLanguage:javascriptreact",
-    "onLanguage:typescriptreact"
+    "onLanguage:typescriptreact",
+    "onLanguage:vue",
+    "onLanguage:svelte"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -48,7 +50,94 @@
       {
         "command": "swaggerFold.foldNow",
         "title": "Fold Swagger Blocks",
-        "category": "Swagger SmartFold"
+        "category": "Swagger SmartFold",
+        "icon": "$(fold)"
+      },
+      {
+        "command": "swaggerFold.unfoldNow",
+        "title": "Unfold Swagger Blocks",
+        "category": "Swagger SmartFold",
+        "icon": "$(unfold)"
+      },
+      {
+        "command": "swaggerFold.toggleFold",
+        "title": "Toggle Fold at Cursor",
+        "category": "Swagger SmartFold",
+        "icon": "$(fold-down)"
+      },
+      {
+        "command": "swaggerFold.nextBlock",
+        "title": "Go to Next Swagger Block",
+        "category": "Swagger SmartFold",
+        "icon": "$(arrow-down)"
+      },
+      {
+        "command": "swaggerFold.previousBlock",
+        "title": "Go to Previous Swagger Block",
+        "category": "Swagger SmartFold",
+        "icon": "$(arrow-up)"
+      },
+      {
+        "command": "swaggerFold.exportToFile",
+        "title": "Export Swagger to File",
+        "category": "Swagger SmartFold",
+        "icon": "$(export)"
+      },
+      {
+        "command": "swaggerFold.exportProject",
+        "title": "Export All Project Swagger to File",
+        "category": "Swagger SmartFold",
+        "icon": "$(file-code)"
+      },
+      {
+        "command": "swaggerFold.copyAsJson",
+        "title": "Copy Swagger Block as JSON",
+        "category": "Swagger SmartFold",
+        "icon": "$(clippy)"
+      },
+      {
+        "command": "swaggerFold.preview",
+        "title": "Preview Swagger UI",
+        "category": "Swagger SmartFold",
+        "icon": "$(preview)"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "swaggerFold.foldNow",
+        "key": "ctrl+alt+s f",
+        "mac": "cmd+alt+s f",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "swaggerFold.unfoldNow",
+        "key": "ctrl+alt+s u",
+        "mac": "cmd+alt+s u",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "swaggerFold.toggleFold",
+        "key": "ctrl+alt+s t",
+        "mac": "cmd+alt+s t",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "swaggerFold.nextBlock",
+        "key": "ctrl+alt+s down",
+        "mac": "cmd+alt+s down",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "swaggerFold.previousBlock",
+        "key": "ctrl+alt+s up",
+        "mac": "cmd+alt+s up",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "swaggerFold.preview",
+        "key": "ctrl+alt+s p",
+        "mac": "cmd+alt+s p",
+        "when": "editorTextFocus"
       }
     ],
     "configuration": {
@@ -57,14 +146,74 @@
         "swaggerFold.autoFold": {
           "type": "boolean",
           "default": true,
-          "description": "Auto-fold @swagger JSDoc blocks when opening a file."
+          "description": "Auto-fold @swagger/@openapi JSDoc blocks when opening a file."
         },
         "swaggerFold.highlight": {
           "type": "boolean",
           "default": true,
           "description": "Enable/disable syntax highlighting and visual distinction for Swagger blocks."
+        },
+        "swaggerFold.exclude": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "description": "Glob patterns for files/folders to exclude from processing (e.g. '**/test/**', '**/node_modules/**')."
+        },
+        "swaggerFold.validationSeverity": {
+          "type": "string",
+          "enum": [
+            "error",
+            "warning",
+            "info"
+          ],
+          "default": "warning",
+          "description": "Severity level for OpenAPI validation errors."
+        },
+        "swaggerFold.autoFoldDelay": {
+          "type": "number",
+          "default": 300,
+          "minimum": 0,
+          "maximum": 5000,
+          "description": "Delay in milliseconds before auto-folding blocks."
+        },
+        "swaggerFold.exportFormat": {
+          "type": "string",
+          "enum": [
+            "yaml",
+            "json"
+          ],
+          "default": "yaml",
+          "description": "Default format for exporting OpenAPI documents."
         }
       }
+    },
+    "menus": {
+      "editor/context": [
+        {
+          "command": "swaggerFold.toggleFold",
+          "when": "editorTextFocus && resourceLangId =~ /javascript|typescript|javascriptreact|typescriptreact|vue|svelte/",
+          "group": "swagger@1"
+        },
+        {
+          "command": "swaggerFold.copyAsJson",
+          "when": "editorTextFocus && resourceLangId =~ /javascript|typescript|javascriptreact|typescriptreact|vue|svelte/",
+          "group": "swagger@2"
+        },
+        {
+          "command": "swaggerFold.preview",
+          "when": "editorTextFocus && resourceLangId =~ /javascript|typescript|javascriptreact|typescriptreact|vue|svelte/",
+          "group": "swagger@3"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "swaggerFold.preview",
+          "when": "resourceLangId =~ /javascript|typescript|javascriptreact|typescriptreact|vue|svelte/",
+          "group": "navigation"
+        }
+      ]
     }
   },
   "scripts": {
