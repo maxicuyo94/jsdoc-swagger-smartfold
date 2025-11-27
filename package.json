@@ -33,6 +33,11 @@
           "type": "boolean",
           "default": true,
           "description": "Auto-fold @swagger JSDoc blocks when opening a file."
+        },
+        "swaggerFold.highlight": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable/disable syntax highlighting and visual distinction for Swagger blocks."
         }
       }
     }

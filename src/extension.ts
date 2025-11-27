@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { findSwaggerBlocks, validateSwagger } from './swaggerUtils';
+import { activateDecorations, updateDecorations } from './decorator';
 
 const JSDOC_SWAGGER_DIAGNOSTICS = 'jsdoc-swagger';
 const SWAGGER_FOLD_COMMAND = 'swaggerFold.foldNow';
@@ -19,15 +20,28 @@ export function activate(context: vscode.ExtensionContext) {
   diagnosticCollection = vscode.languages.createDiagnosticCollection(JSDOC_SWAGGER_DIAGNOSTICS);
   context.subscriptions.push(diagnosticCollection);
 
+  // Initialize Decorations
+  activateDecorations(context);
+
   // Register Command: Manual Fold
   const foldCommand = vscode.commands.registerCommand(SWAGGER_FOLD_COMMAND, handleManualFold);
 
   // Event: Document Open / Changed (Validation)
   const onOpen = vscode.workspace.onDidOpenTextDocument(triggerValidation);
-  const onChange = vscode.workspace.onDidChangeTextDocument((e) => triggerValidation(e.document));
+  const onChange = vscode.workspace.onDidChangeTextDocument((e) => {
+    triggerValidation(e.document);
+    if (vscode.window.activeTextEditor && e.document === vscode.window.activeTextEditor.document) {
+      updateDecorations(vscode.window.activeTextEditor);
+    }
+  });
 
   // Event: Editor Changed (Auto Fold)
-  const onEditorChange = vscode.window.onDidChangeActiveTextEditor(handleActiveEditorChange);
+  const onEditorChange = vscode.window.onDidChangeActiveTextEditor((editor) => {
+    handleActiveEditorChange(editor);
+    if (editor) {
+      updateDecorations(editor);
+    }
+  });
 
   context.subscriptions.push(diagnosticCollection, foldCommand, onOpen, onChange, onEditorChange);
 
@@ -35,6 +49,7 @@ export function activate(context: vscode.ExtensionContext) {
   if (vscode.window.activeTextEditor) {
     const editor = vscode.window.activeTextEditor;
     triggerValidation(editor.document);
+    updateDecorations(editor);
     if (shouldAutoFold()) {
       // We handle the promise rejection internally or ignore it as it's fire-and-forget
       foldSwaggerBlocks(editor).catch((err) => console.error(err));
