@@ -1,0 +1,67 @@
+{
+  "name": "jsdoc-swagger-smartfold",
+  "displayName": "JSDoc Swagger SmartFold",
+  "description": "Auto-fold and validate @swagger JSDoc blocks in JavaScript/TypeScript files.",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other",
+    "Programming Languages",
+    "Linters"
+  ],
+  "activationEvents": [
+    "onLanguage:javascript",
+    "onLanguage:typescript",
+    "onLanguage:javascriptreact",
+    "onLanguage:typescriptreact"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "swaggerFold.foldNow",
+        "title": "Fold Swagger Blocks",
+        "category": "Swagger SmartFold"
+      }
+    ],
+    "configuration": {
+      "title": "JSDoc Swagger SmartFold",
+      "properties": {
+        "swaggerFold.autoFold": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto-fold @swagger JSDoc blocks when opening a file."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "18.x",
+    "@types/vscode": "^1.80.0",
+    "@typescript-eslint/eslint-plugin": "^8.48.0",
+    "@typescript-eslint/parser": "^8.48.0",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "globals": "^16.5.0",
+    "prettier": "^3.7.1",
+    "typescript": "^5.3.3",
+    "typescript-eslint": "^8.48.0"
+  },
+  "dependencies": {
+    "@apidevtools/swagger-parser": "^10.1.0",
+    "js-yaml": "^4.1.0"
+  }
+}
