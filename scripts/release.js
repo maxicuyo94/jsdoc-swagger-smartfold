@@ -22,9 +22,9 @@
  */
 
 require('dotenv').config();
-const { execSync } = require('child_process');
-const fs = require('fs');
-const path = require('path');
+const { execSync } = require('node:child_process');
+const fs = require('node:fs');
+const path = require('node:path');
 
 // Colores para la consola
 const colors = {
@@ -181,30 +181,30 @@ async function main() {
   }
 
   // Paso 5: Publicar en VS Marketplace
-  if (!options.skipVS) {
+  if (options.skipVS) {
+    logStep('5/6', 'Omitiendo Visual Studio Marketplace (--skip-vs)');
+  } else {
     logStep('5/6', 'Publicando en Visual Studio Marketplace...');
     const vsResult = exec(`npx vsce publish -p ${process.env.VSCE_PAT}`);
-    if (!vsResult.success) {
+    if (vsResult.success) {
+      logSuccess('Publicado en Visual Studio Marketplace');
+    } else {
       logError('Error publicando en VS Marketplace');
       logWarning('Continuando con Open VSX...');
-    } else {
-      logSuccess('Publicado en Visual Studio Marketplace');
     }
-  } else {
-    logStep('5/6', 'Omitiendo Visual Studio Marketplace (--skip-vs)');
   }
 
   // Paso 6: Publicar en Open VSX
-  if (!options.skipOVSX) {
+  if (options.skipOVSX) {
+    logStep('6/6', 'Omitiendo Open VSX (--skip-ovsx)');
+  } else {
     logStep('6/6', 'Publicando en Open VSX...');
     const ovsxResult = exec(`npx ovsx publish ${vsixName} -p ${process.env.OPENVSX_TOKEN}`);
-    if (!ovsxResult.success) {
-      logError('Error publicando en Open VSX');
-    } else {
+    if (ovsxResult.success) {
       logSuccess('Publicado en Open VSX');
+    } else {
+      logError('Error publicando en Open VSX');
     }
-  } else {
-    logStep('6/6', 'Omitiendo Open VSX (--skip-ovsx)');
   }
 
   // Resumen final

@@ -95,7 +95,6 @@ code --install-extension maxicuyodev.jsdoc-swagger-smartfold
 
 ```bash
 code --install-extension maxicuyodev.jsdoc-swagger-smartfold
-<<<<<<< HEAD
 
 ---
 
@@ -103,8 +102,6 @@ code --install-extension maxicuyodev.jsdoc-swagger-smartfold
 
 - **Visual Studio Marketplace:** [https://marketplace.visualstudio.com/items?itemName=maxicuyodev.jsdoc-swagger-smartfold](https://marketplace.visualstudio.com/items?itemName=maxicuyodev.jsdoc-swagger-smartfold)
 - **Open VSX:** [https://open-vsx.org/extension/maxicuyodev/jsdoc-swagger-smartfold](https://open-vsx.org/extension/maxicuyodev/jsdoc-swagger-smartfold)
-=======
->>>>>>> 9d76b97707ea90f0ff56ad1418f237d26c9191b4
 ```
 
 ---
