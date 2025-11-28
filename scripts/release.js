@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin / env node
 /* eslint-disable @typescript-eslint/no-require-imports */
 
 /**
@@ -21,6 +21,7 @@
  *   OPENVSX_TOKEN - Token para Open VSX
  */
 
+require('dotenv').config();
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
