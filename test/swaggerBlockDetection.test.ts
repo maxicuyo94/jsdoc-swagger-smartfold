@@ -1,16 +1,30 @@
-import * as assert from 'assert';
-import { detectSwaggerBlock } from '../src/swaggerUtils';
+import * as assert from 'node:assert';
+import { findSwaggerBlocks } from '../src/swaggerUtils';
+import * as vscode from 'vscode';
 
 describe('Swagger Block Detection', () => {
     it('should detect a swagger block', () => {
         const jsdoc = `/**\n * @swagger\n * /api/test:\n *   get:\n *     summary: Test endpoint\n */`;
-        const result = detectSwaggerBlock(jsdoc);
-        assert.ok(result, 'Swagger block should be detected');
+        // Simular un documento VSCode
+        const document = {
+            getText: () => jsdoc,
+            uri: { toString: () => 'test' },
+            version: 1,
+            positionAt: (offset: number) => new vscode.Position(0, offset),
+        } as unknown as vscode.TextDocument;
+        const result = findSwaggerBlocks(document);
+        assert.ok(result.length > 0, 'Swagger block should be detected');
     });
 
     it('should not detect a swagger block in unrelated JSDoc', () => {
         const jsdoc = `/**\n * Just a regular comment\n */`;
-        const result = detectSwaggerBlock(jsdoc);
-        assert.strictEqual(result, false, 'No swagger block should be detected');
+        const document = {
+            getText: () => jsdoc,
+            uri: { toString: () => 'test2' },
+            version: 1,
+            positionAt: (offset: number) => new vscode.Position(0, offset),
+        } as unknown as vscode.TextDocument;
+        const result = findSwaggerBlocks(document);
+        assert.strictEqual(result.length, 0, 'No swagger block should be detected');
     });
 });
