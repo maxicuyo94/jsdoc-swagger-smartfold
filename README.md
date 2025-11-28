@@ -1,7 +1,7 @@
 # JSDoc Swagger SmartFold
 
-[![Visual Studio Marketplace](https://img.shields.io/visual-studio-marketplace/v/tu-publisher-id.jsdoc-swagger-smartfold?label=VS%20Marketplace&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=tu-publisher-id.jsdoc-swagger-smartfold)
-[![Open VSX](https://img.shields.io/open-vsx/v/tu-publisher-id/jsdoc-swagger-smartfold?label=Open%20VSX)](https://open-vsx.org/extension/tu-publisher-id/jsdoc-swagger-smartfold)
+[![Visual Studio Marketplace](https://img.shields.io/visual-studio-marketplace/v/maxicuyodev.jsdoc-swagger-smartfold?label=VS%20Marketplace&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=maxicuyodev.jsdoc-swagger-smartfold)
+[![Open VSX](https://img.shields.io/open-vsx/v/maxicuyodev/jsdoc-swagger-smartfold?label=Open%20VSX)](https://open-vsx.org/extension/maxicuyodev/jsdoc-swagger-smartfold)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A VS Code extension that automatically detects, folds, validates, and provides rich features for `@swagger` and `@openapi` blocks within JSDoc comments in JavaScript and TypeScript files.
@@ -256,7 +256,7 @@ The exported document includes:
 If you find this extension useful and want to support its development, consider getting the **PRO version for just $1**. It's a symbolic way to say "thanks" and help keep the project alive!
 
 <p align="center">
-  <a href="https://example.com/buy-pro">
+  <a href="https://maxibee7.gumroad.com/l/JSDocSwaggerSmartFoldPRO">
     <img src="https://img.shields.io/badge/Get%20PRO-$1%20USD-ff6b6b?style=for-the-badge&logo=heart&logoColor=white" alt="Get PRO Version - $1 USD">
   </a>
 </p>
@@ -286,7 +286,7 @@ If you find this extension useful and want to support its development, consider 
 
 ### How to Install PRO Version
 
-1. **Purchase** the PRO version from [our store](https://example.com/buy-pro)
+1. **Purchase** the PRO version from [Gumroad](https://maxibee7.gumroad.com/l/JSDocSwaggerSmartFoldPRO)
 2. **Download** the `.vsix` file from the purchase confirmation page
 3. **Install** manually in VS Code:
 

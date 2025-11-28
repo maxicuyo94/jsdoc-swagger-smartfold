@@ -3,17 +3,17 @@
   "displayName": "JSDoc Swagger SmartFold",
   "description": "Auto-fold and validate @swagger/@openapi JSDoc blocks in JavaScript/TypeScript files.",
   "version": "0.0.1",
-  "publisher": "tu-publisher-id",
+  "publisher": "maxicuyodev",
   "license": "MIT",
   "icon": "images/icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/tu-usuario/jsdoc-swagger-smartfold.git"
+    "url": "https://github.com/maxicuyo94/jsdoc-swagger-smartfold.git"
   },
   "bugs": {
-    "url": "https://github.com/tu-usuario/jsdoc-swagger-smartfold/issues"
+    "url": "https://github.com/maxicuyo94/jsdoc-swagger-smartfold/issues"
   },
-  "homepage": "https://github.com/tu-usuario/jsdoc-swagger-smartfold#readme",
+  "homepage": "https://github.com/maxicuyo94/jsdoc-swagger-smartfold#readme",
   "keywords": [
     "swagger",
     "openapi",
@@ -252,6 +252,7 @@
   },
   "dependencies": {
     "@apidevtools/swagger-parser": "^10.1.0",
+    "dotenv": "^17.2.3",
     "js-yaml": "^4.1.0"
   }
 }
