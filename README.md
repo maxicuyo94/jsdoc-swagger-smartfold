@@ -88,13 +88,20 @@ Automatic code actions for common issues:
 
 Or run:
 ```bash
-code --install-extension tu-publisher-id.jsdoc-swagger-smartfold
+code --install-extension maxicuyodev.jsdoc-swagger-smartfold
 ```
 
 ### From Open VSX (VSCodium, Gitpod, etc.)
 
 ```bash
-code --install-extension tu-publisher-id.jsdoc-swagger-smartfold
+code --install-extension maxicuyodev.jsdoc-swagger-smartfold
+
+---
+
+## Descarga oficial
+
+- **Visual Studio Marketplace:** [https://marketplace.visualstudio.com/items?itemName=maxicuyodev.jsdoc-swagger-smartfold](https://marketplace.visualstudio.com/items?itemName=maxicuyodev.jsdoc-swagger-smartfold)
+- **Open VSX:** [https://open-vsx.org/extension/maxicuyodev/jsdoc-swagger-smartfold](https://open-vsx.org/extension/maxicuyodev/jsdoc-swagger-smartfold)
 ```
 
 ---
