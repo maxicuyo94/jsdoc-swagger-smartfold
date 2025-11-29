@@ -256,17 +256,27 @@ The exported document includes:
 
 ---
 
-## 💖 Support the Project — PRO Version ($1)
+## 💖 Support the Project
 
 **JSDoc Swagger SmartFold** is free and open-source. The FREE version is fully functional and will always remain so.
 
-If you find this extension useful and want to support its development, consider getting the **PRO version for just $1**. It's a symbolic way to say "thanks" and help keep the project alive!
+If you find this extension useful and want to support its development, you can:
 
 <p align="center">
+  <a href="https://cafecito.app/maxxwer">
+    <img src="https://img.shields.io/badge/Invitame%20un%20Cafecito-☕-6f4e37?style=for-the-badge" alt="Invitame un Cafecito">
+  </a>
+  &nbsp;&nbsp;
   <a href="https://maxibee7.gumroad.com/l/JSDocSwaggerSmartFoldPRO">
     <img src="https://img.shields.io/badge/Get%20PRO-$1%20USD-ff6b6b?style=for-the-badge&logo=heart&logoColor=white" alt="Get PRO Version - $1 USD">
   </a>
 </p>
+
+### ☕ Buy me a Cafecito
+
+If you're from Argentina or just want to send a quick tip, you can [invite me a cafecito](https://cafecito.app/maxxwer)! It's a simple way to say thanks.
+
+### 🎁 PRO Version ($1)
 
 ### What's included in PRO?
 
@@ -394,8 +404,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 </p>
 
 <p align="center">
-  <a href="https://example.com/buy-pro">
-    <img src="https://img.shields.io/badge/Support%20this%20project-$1-ff6b6b?style=flat-square" alt="Support this project">
+  <a href="https://cafecito.app/maxxwer">
+    <img src="https://img.shields.io/badge/☕%20Cafecito-Support-6f4e37?style=flat-square" alt="Invitame un Cafecito">
+  </a>
+  &nbsp;
+  <a href="https://maxibee7.gumroad.com/l/JSDocSwaggerSmartFoldPRO">
+    <img src="https://img.shields.io/badge/PRO-$1-ff6b6b?style=flat-square" alt="Get PRO">
   </a>
 </p>
 
