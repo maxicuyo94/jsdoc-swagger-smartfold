@@ -33,6 +33,7 @@ node_modules/**
 TESTING_GUIDE.md
 CONTRIBUTING.md
 .local/**
+examples/**
 
 # Archivos del sistema
 .DS_Store

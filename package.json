@@ -234,6 +234,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@types/express": "^5.0.5",
     "@types/jest": "^30.0.0",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "18.x",
@@ -245,6 +246,7 @@
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",
+    "express": "^5.1.0",
     "globals": "^16.5.0",
     "ovsx": "^0.9.5",
     "prettier": "^3.7.1",

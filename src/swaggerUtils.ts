@@ -32,23 +32,29 @@ interface YamlError {
 const JS_DOC_REGEX = /\/\*\*([\s\S]*?)\*\//g;
 const CLOSING_COMMENT_REGEX = /\*\/$/;
 const LEADING_ASTERISK_REGEX = /^\s*\*\s?/;
+// Regex to match @swagger or @openapi as actual JSDoc tags (not mentioned in text)
+// Matches: start of line, optional whitespace, *, optional whitespace, then the tag
+const SWAGGER_TAG_REGEX = /^\s*\*\s*(@swagger|@openapi)\s*$/m;
 
 // Cache for parsed blocks
 const blocksCache = new DocumentCache<SwaggerBlock[]>(10);
 
 /**
- * Check if content contains any swagger/openapi tag
+ * Check if content contains any swagger/openapi tag as an actual JSDoc tag
+ * (not just mentioned in description text)
  */
 function containsSwaggerTag(content: string): boolean {
-  return SWAGGER_TAGS.some((tag) => content.includes(tag));
+  return SWAGGER_TAG_REGEX.test(content);
 }
 
 /**
- * Find which swagger tag is in the line
+ * Find which swagger tag is in the line (must be the tag itself, not mentioned in text)
  */
 function findSwaggerTagInLine(line: string): string | null {
+  // Remove leading whitespace and asterisk, then check if line is just the tag
+  const cleanLine = line.replace(LEADING_ASTERISK_REGEX, '').trim();
   for (const tag of SWAGGER_TAGS) {
-    if (line.includes(tag)) {
+    if (cleanLine === tag) {
       return tag;
     }
   }
@@ -319,6 +325,19 @@ function createOpenApiErrorDiagnostic(block: SwaggerBlock, err: unknown): vscode
   return diagnostic;
 }
 
+// Top-level OpenAPI properties that should NOT be placed under paths
+const OPENAPI_ROOT_PROPERTIES = new Set([
+  'openapi',
+  'swagger',
+  'info',
+  'servers',
+  'paths',
+  'components',
+  'security',
+  'tags',
+  'externalDocs',
+]);
+
 function prepareOpenApiDoc(parsedYaml: unknown): Record<string, unknown> | null {
   if (typeof parsedYaml !== 'object' || parsedYaml === null) {
     return null;
@@ -331,13 +350,33 @@ function prepareOpenApiDoc(parsedYaml: unknown): Record<string, unknown> | null 
     return doc;
   }
 
-  // Wrap fragment in minimal OpenAPI structure
-  return {
+  // Separate root-level OpenAPI properties from path definitions
+  const rootProps: Record<string, unknown> = {};
+  const pathProps: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(doc)) {
+    if (OPENAPI_ROOT_PROPERTIES.has(key)) {
+      // This is a root-level OpenAPI property (components, tags, etc.)
+      rootProps[key] = value;
+    } else if (key.startsWith('/')) {
+      // This is a path definition
+      pathProps[key] = value;
+    } else {
+      // Unknown property - treat as path for validation to catch the error
+      pathProps[key] = value;
+    }
+  }
+
+  // Build the OpenAPI document
+  const result: Record<string, unknown> = {
     openapi: '3.0.0',
     info: {
       title: 'Temp Validator',
       version: '1.0.0',
     },
-    paths: parsedYaml,
+    paths: Object.keys(pathProps).length > 0 ? pathProps : {},
+    ...rootProps,
   };
+
+  return result;
 }
