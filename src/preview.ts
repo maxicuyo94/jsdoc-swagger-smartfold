@@ -28,22 +28,49 @@ export async function showSwaggerPreview(_context: vscode.ExtensionContext): Pro
 
   // Merge blocks into OpenAPI spec
   const paths: Record<string, unknown> = {};
+  const components: Record<string, unknown> = {};
+  const tags: unknown[] = [];
+  const servers: unknown[] = [];
+  const security: unknown[] = [];
+  let externalDocs: unknown = undefined;
+
   for (const block of blocks) {
     const parsed = parseYamlContent(block.yamlContent);
     if (parsed) {
       for (const [key, value] of Object.entries(parsed)) {
         if (key.startsWith('/')) {
+          // Path definition
           if (paths[key]) {
             paths[key] = { ...(paths[key] as object), ...(value as object) };
           } else {
             paths[key] = value;
           }
+        } else if (key === 'components' && typeof value === 'object' && value !== null) {
+          // Merge components (schemas, responses, parameters, etc.)
+          for (const [compKey, compValue] of Object.entries(value as Record<string, unknown>)) {
+            if (components[compKey] && typeof components[compKey] === 'object') {
+              components[compKey] = {
+                ...(components[compKey] as object),
+                ...(compValue as object),
+              };
+            } else {
+              components[compKey] = compValue;
+            }
+          }
+        } else if (key === 'tags' && Array.isArray(value)) {
+          tags.push(...value);
+        } else if (key === 'servers' && Array.isArray(value)) {
+          servers.push(...value);
+        } else if (key === 'security' && Array.isArray(value)) {
+          security.push(...value);
+        } else if (key === 'externalDocs') {
+          externalDocs = value;
         }
       }
     }
   }
 
-  const spec = {
+  const spec: Record<string, unknown> = {
     openapi: '3.0.3',
     info: {
       title: `${document.fileName.split(/[\\/]/).pop()} API`,
@@ -51,6 +78,23 @@ export async function showSwaggerPreview(_context: vscode.ExtensionContext): Pro
     },
     paths,
   };
+
+  // Add optional root-level properties if they exist
+  if (Object.keys(components).length > 0) {
+    spec.components = components;
+  }
+  if (tags.length > 0) {
+    spec.tags = tags;
+  }
+  if (servers.length > 0) {
+    spec.servers = servers;
+  }
+  if (security.length > 0) {
+    spec.security = security;
+  }
+  if (externalDocs) {
+    spec.externalDocs = externalDocs;
+  }
 
   // Create or reveal panel
   if (previewPanel) {
