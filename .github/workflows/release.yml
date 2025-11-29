@@ -73,17 +73,21 @@ jobs:
         id: publish-vs
         continue-on-error: true
         env:
-          VSCE_PAT: ${{ secrets.VSCE_TOKEN }}
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: |
+          if [ -z "$VSCE_PAT" ]; then
+            echo "::error::VSCE_PAT secret is not configured"
+            exit 1
+          fi
           echo "Publicando en Visual Studio Marketplace..."
-          npx vsce publish -p $VSCE_PAT
+          npx vsce publish -p "$VSCE_PAT"
           echo "status=success" >> $GITHUB_OUTPUT
 
       # 10. Verificar resultado de VS Marketplace
       - name: Check VS Marketplace publish result
         if: steps.publish-vs.outcome == 'failure'
         run: |
-          echo "::warning::La publicación en VS Marketplace falló. Verifica el token VSCE_TOKEN."
+          echo "::warning::La publicación en VS Marketplace falló. Verifica el token VSCE_PAT."
 
       # 11. Publicar en Open VSX
       - name: Publish to Open VSX
@@ -92,8 +96,12 @@ jobs:
         env:
           OPENVSX_TOKEN: ${{ secrets.OPENVSX_TOKEN }}
         run: |
+          if [ -z "$OPENVSX_TOKEN" ]; then
+            echo "::error::OPENVSX_TOKEN secret is not configured"
+            exit 1
+          fi
           echo "Publicando en Open VSX..."
-          npx ovsx publish ${{ env.VSIX_FILE }} -p $OPENVSX_TOKEN
+          npx ovsx publish ${{ env.VSIX_FILE }} -p "$OPENVSX_TOKEN"
           echo "status=success" >> $GITHUB_OUTPUT
 
       # 12. Verificar resultado de Open VSX
