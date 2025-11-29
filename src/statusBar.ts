@@ -8,32 +8,12 @@ let statusBarItem: vscode.StatusBarItem;
  * Activate status bar item showing swagger block count
  */
 export function activateStatusBar(context: vscode.ExtensionContext): void {
-  statusBarItem = vscode.window.createStatusBarItem(
-    vscode.StatusBarAlignment.Right,
-    100,
-  );
+  statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
 
   statusBarItem.command = COMMANDS.FOLD_NOW;
   statusBarItem.tooltip = 'Click to fold all Swagger blocks';
 
   context.subscriptions.push(statusBarItem);
-
-  // Update on editor change
-  context.subscriptions.push(
-    vscode.window.onDidChangeActiveTextEditor(() => {
-      updateStatusBar();
-    }),
-  );
-
-  // Update on document change
-  context.subscriptions.push(
-    vscode.workspace.onDidChangeTextDocument((e) => {
-      const editor = vscode.window.activeTextEditor;
-      if (editor && e.document === editor.document) {
-        updateStatusBar();
-      }
-    }),
-  );
 
   // Initial update
   updateStatusBar();
@@ -70,4 +50,3 @@ export function disposeStatusBar(): void {
     statusBarItem.dispose();
   }
 }
-

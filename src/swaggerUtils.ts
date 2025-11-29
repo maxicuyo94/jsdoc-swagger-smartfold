@@ -311,13 +311,10 @@ function createOpenApiErrorDiagnostic(block: SwaggerBlock, err: unknown): vscode
     warning: vscode.DiagnosticSeverity.Warning,
     info: vscode.DiagnosticSeverity.Information,
   };
-  const severity = severityMap[configManager.validationSeverity] ?? vscode.DiagnosticSeverity.Warning;
+  const severity =
+    severityMap[configManager.validationSeverity] ?? vscode.DiagnosticSeverity.Warning;
 
-  const diagnostic = new vscode.Diagnostic(
-    range,
-    `OpenAPI Validation Error: ${message}`,
-    severity,
-  );
+  const diagnostic = new vscode.Diagnostic(range, `OpenAPI Validation Error: ${message}`, severity);
   diagnostic.source = DIAGNOSTICS_SOURCE;
   return diagnostic;
 }
