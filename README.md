@@ -95,14 +95,12 @@ code --install-extension maxicuyodev.jsdoc-swagger-smartfold
 
 ```bash
 code --install-extension maxicuyodev.jsdoc-swagger-smartfold
-
----
-
-## Descarga oficial
-
-- **Visual Studio Marketplace:** [https://marketplace.visualstudio.com/items?itemName=maxicuyodev.jsdoc-swagger-smartfold](https://marketplace.visualstudio.com/items?itemName=maxicuyodev.jsdoc-swagger-smartfold)
-- **Open VSX:** [https://open-vsx.org/extension/maxicuyodev/jsdoc-swagger-smartfold](https://open-vsx.org/extension/maxicuyodev/jsdoc-swagger-smartfold)
 ```
+
+### Official Downloads
+
+- **Visual Studio Marketplace:** [VS Marketplace](https://marketplace.visualstudio.com/items?itemName=maxicuyodev.jsdoc-swagger-smartfold)
+- **Open VSX:** [Open VSX](https://open-vsx.org/extension/maxicuyodev/jsdoc-swagger-smartfold)
 
 ---
 
@@ -372,9 +370,8 @@ src/
 
 ### Found a bug? Have a feature request?
 
-- 🐛 **Report bugs:** [GitHub Issues](https://github.com/tu-usuario/jsdoc-swagger-smartfold/issues)
-- 💡 **Feature requests:** [GitHub Discussions](https://github.com/tu-usuario/jsdoc-swagger-smartfold/discussions)
-- 📧 **Email support (PRO):** support@example.com
+- 🐛 **Report bugs:** [GitHub Issues](https://github.com/maxicuyo94/jsdoc-swagger-smartfold/issues)
+- 💡 **Feature requests:** [GitHub Issues](https://github.com/maxicuyo94/jsdoc-swagger-smartfold/issues)
 
 ### Support Policy
 
