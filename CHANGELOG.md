@@ -21,6 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.0.4] - 2024-11-29
+
+### Fixed
+- Fixed OpenAPI validation error for `components` blocks: `#/paths must NOT have additional properties`
+- Root-level OpenAPI properties (`components`, `tags`, `security`, etc.) are now correctly identified and placed at document root instead of being incorrectly added to `paths`
+
+---
+
 ## [0.1.0] - 2024-XX-XX
 
 ### Added
