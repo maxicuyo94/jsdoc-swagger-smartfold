@@ -212,7 +212,7 @@ async function handleManualUnfold(): Promise<void> {
   }
 }
 
-async function handleToggleFold(): Promise<void> {
+async function handleToggleFold(block?: SwaggerBlock): Promise<void> {
   const editor = vscode.window.activeTextEditor;
   if (!editor) {
     return;
@@ -223,19 +223,24 @@ async function handleToggleFold(): Promise<void> {
     return;
   }
 
-  const position = editor.selection.active;
-  const blocks = findSwaggerBlocks(document);
-  const blockAtCursor = blocks.find((b) => b.range.contains(position));
+  let targetBlock = block;
 
-  if (!blockAtCursor) {
-    vscode.window.showInformationMessage('Cursor is not inside a Swagger block');
-    return;
+  // If no block provided, find the block at cursor position
+  if (!targetBlock) {
+    const position = editor.selection.active;
+    const blocks = findSwaggerBlocks(document);
+    targetBlock = blocks.find((b) => b.range.contains(position));
+
+    if (!targetBlock) {
+      vscode.window.showInformationMessage('Cursor is not inside a Swagger block');
+      return;
+    }
   }
 
   const originalSelections = editor.selections;
 
   try {
-    editor.selection = new vscode.Selection(blockAtCursor.range.start, blockAtCursor.range.start);
+    editor.selection = new vscode.Selection(targetBlock.range.start, targetBlock.range.start);
     await vscode.commands.executeCommand('editor.toggleFold');
   } finally {
     editor.selections = originalSelections;

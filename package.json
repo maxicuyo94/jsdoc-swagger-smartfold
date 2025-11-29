@@ -2,7 +2,7 @@
   "name": "jsdoc-swagger-smartfold",
   "displayName": "JSDoc Swagger SmartFold",
   "description": "Auto-fold and validate @swagger/@openapi JSDoc blocks in JavaScript/TypeScript files.",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "publisher": "maxicuyodev",
   "license": "MIT",
   "icon": "images/icon.png",
