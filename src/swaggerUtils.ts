@@ -355,15 +355,16 @@ function prepareOpenApiDoc(parsedYaml: unknown): Record<string, unknown> | null 
   const pathProps: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(doc)) {
-    if (OPENAPI_ROOT_PROPERTIES.has(key)) {
+    const normalizedKey = key.trim();
+    if (OPENAPI_ROOT_PROPERTIES.has(normalizedKey)) {
       // This is a root-level OpenAPI property (components, tags, etc.)
-      rootProps[key] = value;
-    } else if (key.startsWith('/')) {
+      rootProps[normalizedKey] = value;
+    } else if (normalizedKey.startsWith('/')) {
       // This is a path definition
-      pathProps[key] = value;
+      pathProps[normalizedKey] = value;
     } else {
       // Unknown property - treat as path for validation to catch the error
-      pathProps[key] = value;
+      pathProps[normalizedKey] = value;
     }
   }
 
