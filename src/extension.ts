@@ -77,7 +77,9 @@ export function activate(context: vscode.ExtensionContext): void {
     // Export commands
     vscode.commands.registerCommand(COMMANDS.EXPORT_FILE, exportCurrentFile),
     vscode.commands.registerCommand(COMMANDS.EXPORT_PROJECT, exportProject),
-    vscode.commands.registerCommand(COMMANDS.COPY_AS_JSON, (block?: SwaggerBlock) => copyBlockAsJson(block)),
+    vscode.commands.registerCommand(COMMANDS.COPY_AS_JSON, (block?: SwaggerBlock) =>
+      copyBlockAsJson(block),
+    ),
 
     // Preview command
     vscode.commands.registerCommand(COMMANDS.PREVIEW, () => showSwaggerPreview(context)),

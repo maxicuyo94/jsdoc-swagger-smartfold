@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { findSwaggerBlocks, parseYamlContent, objectToYaml } from './swaggerUtils';
+import { findSwaggerBlocks, parseYamlContent } from './swaggerUtils';
 import { isSupportedLanguage, DIAGNOSTICS_SOURCE } from './constants';
 
 /**
@@ -25,9 +25,7 @@ export class SwaggerCodeActionProvider implements vscode.CodeActionProvider {
     const actions: vscode.CodeAction[] = [];
 
     // Find swagger diagnostics in range
-    const swaggerDiagnostics = context.diagnostics.filter(
-      (d) => d.source === DIAGNOSTICS_SOURCE,
-    );
+    const swaggerDiagnostics = context.diagnostics.filter((d) => d.source === DIAGNOSTICS_SOURCE);
 
     // Add quick fixes for diagnostics
     for (const diagnostic of swaggerDiagnostics) {
@@ -90,10 +88,7 @@ export class SwaggerCodeActionProvider implements vscode.CodeActionProvider {
     document: vscode.TextDocument,
     diagnostic: vscode.Diagnostic,
   ): vscode.CodeAction | null {
-    const fix = new vscode.CodeAction(
-      'Add default responses',
-      vscode.CodeActionKind.QuickFix,
-    );
+    const fix = new vscode.CodeAction('Add default responses', vscode.CodeActionKind.QuickFix);
 
     const responsesSnippet = `      responses:
         200:
@@ -118,10 +113,7 @@ export class SwaggerCodeActionProvider implements vscode.CodeActionProvider {
     document: vscode.TextDocument,
     diagnostic: vscode.Diagnostic,
   ): vscode.CodeAction | null {
-    const fix = new vscode.CodeAction(
-      'Add summary field',
-      vscode.CodeActionKind.QuickFix,
-    );
+    const fix = new vscode.CodeAction('Add summary field', vscode.CodeActionKind.QuickFix);
 
     const edit = new vscode.WorkspaceEdit();
     const insertPosition = new vscode.Position(diagnostic.range.start.line + 1, 0);
@@ -137,10 +129,7 @@ export class SwaggerCodeActionProvider implements vscode.CodeActionProvider {
     document: vscode.TextDocument,
     diagnostic: vscode.Diagnostic,
   ): vscode.CodeAction | null {
-    const fix = new vscode.CodeAction(
-      'Add operationId',
-      vscode.CodeActionKind.QuickFix,
-    );
+    const fix = new vscode.CodeAction('Add operationId', vscode.CodeActionKind.QuickFix);
 
     const edit = new vscode.WorkspaceEdit();
     const insertPosition = new vscode.Position(diagnostic.range.start.line + 1, 0);
@@ -160,10 +149,7 @@ export class SwaggerCodeActionProvider implements vscode.CodeActionProvider {
     const fixes: vscode.CodeAction[] = [];
 
     for (const type of validTypes) {
-      const fix = new vscode.CodeAction(
-        `Change to "${type}"`,
-        vscode.CodeActionKind.QuickFix,
-      );
+      const fix = new vscode.CodeAction(`Change to "${type}"`, vscode.CodeActionKind.QuickFix);
 
       const edit = new vscode.WorkspaceEdit();
       const line = document.lineAt(diagnostic.range.start.line);
@@ -235,4 +221,3 @@ export function activateCodeActions(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(disposable);
 }
-

@@ -123,4 +123,3 @@ export function activateCodeLens(context: vscode.ExtensionContext): SwaggerCodeL
 
   return provider;
 }
-

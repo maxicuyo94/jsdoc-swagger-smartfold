@@ -122,12 +122,12 @@ jobs:
 
             **Visual Studio Marketplace:**
             ```
-            ext install tu-publisher-id.jsdoc-swagger-smartfold
+            ext install maxicuyodev.jsdoc-swagger-smartfold
             ```
 
             **Open VSX:**
             ```
-            ext install tu-publisher-id.jsdoc-swagger-smartfold
+            ext install maxicuyodev.jsdoc-swagger-smartfold
             ```
 
             **Instalación manual:**

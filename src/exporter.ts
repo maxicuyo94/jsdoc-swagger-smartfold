@@ -82,7 +82,7 @@ export async function exportProject(): Promise<void> {
         }
 
         progress.report({
-          increment: (100 / files.length),
+          increment: 100 / files.length,
           message: `${i + 1}/${files.length} files`,
         });
 
@@ -186,9 +186,7 @@ async function saveOpenApiDocument(doc: OpenApiDocument, basePath: string): Prom
   const ext = format === 'json' ? 'json' : 'yaml';
 
   // Ask user for save location
-  const defaultUri = vscode.Uri.file(
-    path.join(path.dirname(basePath), `openapi.${ext}`),
-  );
+  const defaultUri = vscode.Uri.file(path.join(path.dirname(basePath), `openapi.${ext}`));
 
   const saveUri = await vscode.window.showSaveDialog({
     defaultUri,
@@ -258,4 +256,3 @@ export async function copyBlockAsJson(block?: SwaggerBlock): Promise<void> {
   await vscode.env.clipboard.writeText(json);
   vscode.window.showInformationMessage('Swagger block copied as JSON');
 }
-

@@ -1,5 +1,4 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
 
 // Extension identifiers
 export const EXTENSION_ID = 'jsdoc-swagger-smartfold';
@@ -65,10 +64,7 @@ export function isFileExcluded(filePath: string, excludePatterns: string[]): boo
 
   for (const pattern of excludePatterns) {
     // Simple glob matching for common patterns
-    const regexPattern = pattern
-      .replace(/\*\*/g, '.*')
-      .replace(/\*/g, '[^/]*')
-      .replace(/\?/g, '.');
+    const regexPattern = pattern.replace(/\*\*/g, '.*').replace(/\*/g, '[^/]*').replace(/\?/g, '.');
 
     const regex = new RegExp(regexPattern);
     if (regex.test(normalizedPath)) {
@@ -114,7 +110,10 @@ class ConfigManager {
   }
 
   get validationSeverity(): 'error' | 'warning' | 'info' {
-    return this.getConfig().get<'error' | 'warning' | 'info'>(CONFIG.VALIDATION_SEVERITY, 'warning');
+    return this.getConfig().get<'error' | 'warning' | 'info'>(
+      CONFIG.VALIDATION_SEVERITY,
+      'warning',
+    );
   }
 
   get autoFoldDelay(): number {

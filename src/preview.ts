@@ -1,5 +1,4 @@
 import * as vscode from 'vscode';
-import * as yaml from 'js-yaml';
 import { findSwaggerBlocks, parseYamlContent } from './swaggerUtils';
 import { isSupportedLanguage } from './constants';
 
@@ -213,4 +212,3 @@ export function disposePreview(): void {
     previewPanel = undefined;
   }
 }
-

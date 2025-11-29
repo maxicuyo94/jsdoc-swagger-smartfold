@@ -42,10 +42,10 @@ export class SwaggerHoverProvider implements vscode.HoverProvider {
     md.supportHtml = true;
 
     if (block.endpointInfo) {
-      const { method, path, summary, description, tags, parameters, responses } = block.endpointInfo;
+      const { method, path, summary, description, tags, parameters, responses } =
+        block.endpointInfo;
 
       // Header with method badge
-      const methodColor = this.getMethodColor(method);
       md.appendMarkdown(`### \`${method}\` ${path}\n\n`);
 
       // Summary
@@ -83,19 +83,6 @@ export class SwaggerHoverProvider implements vscode.HoverProvider {
     return md;
   }
 
-  private getMethodColor(method: string): string {
-    const colors: Record<string, string> = {
-      GET: '#61affe',
-      POST: '#49cc90',
-      PUT: '#fca130',
-      PATCH: '#50e3c2',
-      DELETE: '#f93e3e',
-      OPTIONS: '#0d5aa7',
-      HEAD: '#9012fe',
-    };
-    return colors[method] || '#999999';
-  }
-
   private truncateYaml(yaml: string, maxLines: number): string {
     const lines = yaml.split('\n');
     if (lines.length <= maxLines) {
@@ -125,4 +112,3 @@ export function activateHoverProvider(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(disposable);
 }
-
