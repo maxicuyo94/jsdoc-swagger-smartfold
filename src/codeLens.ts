@@ -51,6 +51,7 @@ export class SwaggerCodeLensProvider implements vscode.CodeLensProvider {
         new vscode.CodeLens(range, {
           title,
           command: COMMANDS.TOGGLE_FOLD,
+          arguments: [block],
           tooltip: 'Click to toggle fold',
         }),
       );
@@ -82,6 +83,7 @@ export class SwaggerCodeLensProvider implements vscode.CodeLensProvider {
         new vscode.CodeLens(range, {
           title: '📋 Swagger Block',
           command: COMMANDS.TOGGLE_FOLD,
+          arguments: [block],
           tooltip: 'Click to toggle fold',
         }),
       );

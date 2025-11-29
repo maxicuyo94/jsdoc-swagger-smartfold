@@ -21,6 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.0.5] - 2024-11-29
+
+### Fixed
+- Fixed toggle fold from CodeLens not working correctly - blocks were unfolding immediately after folding
+- CodeLens now passes the block reference directly to the toggle fold command instead of relying on cursor position
+
+---
+
 ## [0.0.4] - 2024-11-29
 
 ### Fixed
