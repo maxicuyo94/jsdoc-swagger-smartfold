@@ -58,11 +58,46 @@ export async function showSwaggerPreview(_context: vscode.ExtensionContext): Pro
             }
           }
         } else if (key === 'tags' && Array.isArray(value)) {
-          tags.push(...value);
+          // Deduplicate tags by name
+          for (const tag of value) {
+            if (
+              tag &&
+              typeof tag === 'object' &&
+              'name' in tag &&
+              !tags.some((t) => (t as { name?: string }).name === tag.name)
+            ) {
+              tags.push(tag);
+            }
+          }
         } else if (key === 'servers' && Array.isArray(value)) {
-          servers.push(...value);
+          // Deduplicate servers by URL
+          for (const server of value) {
+            if (
+              server &&
+              typeof server === 'object' &&
+              'url' in server &&
+              !servers.some((s) => (s as { url?: string }).url === server.url)
+            ) {
+              servers.push(server);
+            }
+          }
         } else if (key === 'security' && Array.isArray(value)) {
-          security.push(...value);
+          // Deduplicate security requirements by their keys
+          for (const secReq of value) {
+            if (secReq && typeof secReq === 'object') {
+              const secKeys = Object.keys(secReq).sort().join(',');
+              if (
+                !security.some(
+                  (s) =>
+                    typeof s === 'object' &&
+                    s !== null &&
+                    Object.keys(s).sort().join(',') === secKeys,
+                )
+              ) {
+                security.push(secReq);
+              }
+            }
+          }
         } else if (key === 'externalDocs') {
           externalDocs = value;
         }
