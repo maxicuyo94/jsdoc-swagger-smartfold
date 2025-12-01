@@ -3,6 +3,7 @@
 [![Visual Studio Marketplace](https://img.shields.io/visual-studio-marketplace/v/maxicuyodev.jsdoc-swagger-smartfold?label=VS%20Marketplace&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=maxicuyodev.jsdoc-swagger-smartfold)
 [![Open VSX](https://img.shields.io/open-vsx/v/maxicuyodev/jsdoc-swagger-smartfold?label=Open%20VSX)](https://open-vsx.org/extension/maxicuyodev/jsdoc-swagger-smartfold)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Languages](https://img.shields.io/badge/Languages-JS%20|%20TS%20|%20JSX%20|%20TSX%20|%20Vue%20|%20Svelte-blue)](#supported-languages)
 
 A VS Code extension that automatically detects, folds, validates, and provides rich features for `@swagger` and `@openapi` blocks within JSDoc comments in JavaScript and TypeScript files.
 
