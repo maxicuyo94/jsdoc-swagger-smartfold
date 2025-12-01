@@ -12,11 +12,7 @@ interface OpenApiDocument {
     description?: string;
   };
   paths: Record<string, unknown>;
-  components?: {
-    schemas?: Record<string, unknown>;
-    parameters?: Record<string, unknown>;
-    responses?: Record<string, unknown>;
-  };
+  components?: Record<string, Record<string, unknown>>;
   tags?: Array<{ name: string; description?: string }>;
 }
 
@@ -114,8 +110,25 @@ export async function exportProject(): Promise<void> {
  */
 function mergeBlocksToOpenApi(blocks: SwaggerBlock[], title: string): OpenApiDocument {
   const paths: Record<string, unknown> = {};
-  const schemas: Record<string, unknown> = {};
+  const components: Record<string, Record<string, unknown>> = {};
   const tagsSet = new Set<string>();
+
+  const mergeComponentSection = (sectionKey: string, sectionValue: unknown): void => {
+    if (typeof sectionValue !== 'object' || sectionValue === null) {
+      return;
+    }
+
+    if (!components[sectionKey]) {
+      components[sectionKey] = {};
+    }
+
+    const targetSection = components[sectionKey];
+    for (const [itemKey, itemValue] of Object.entries(sectionValue as Record<string, unknown>)) {
+      if (!(itemKey in targetSection)) {
+        targetSection[itemKey] = itemValue;
+      }
+    }
+  };
 
   for (const block of blocks) {
     const parsed = parseYamlContent(block.yamlContent);
@@ -147,9 +160,9 @@ function mergeBlocksToOpenApi(blocks: SwaggerBlock[], title: string): OpenApiDoc
         }
       } else if (key === 'components') {
         // Merge components
-        const components = value as Record<string, unknown>;
-        if (components.schemas) {
-          Object.assign(schemas, components.schemas);
+        const componentSections = value as Record<string, unknown>;
+        for (const [sectionKey, sectionValue] of Object.entries(componentSections)) {
+          mergeComponentSection(sectionKey, sectionValue);
         }
       }
     }
@@ -165,9 +178,9 @@ function mergeBlocksToOpenApi(blocks: SwaggerBlock[], title: string): OpenApiDoc
     paths,
   };
 
-  // Add components if any schemas were found
-  if (Object.keys(schemas).length > 0) {
-    doc.components = { schemas };
+  // Add components if any were found
+  if (Object.keys(components).length > 0) {
+    doc.components = components;
   }
 
   // Add tags
