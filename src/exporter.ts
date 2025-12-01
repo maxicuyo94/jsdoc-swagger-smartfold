@@ -186,7 +186,18 @@ async function saveOpenApiDocument(doc: OpenApiDocument, basePath: string): Prom
   const ext = format === 'json' ? 'json' : 'yaml';
 
   // Ask user for save location
-  const defaultUri = vscode.Uri.file(path.join(path.dirname(basePath), `openapi.${ext}`));
+  let targetDir = path.dirname(basePath);
+
+  try {
+    const baseStat = await vscode.workspace.fs.stat(vscode.Uri.file(basePath));
+    if (baseStat.type === vscode.FileType.Directory) {
+      targetDir = basePath;
+    }
+  } catch {
+    // Fall back to using the directory name when stat fails
+  }
+
+  const defaultUri = vscode.Uri.file(path.join(targetDir, `openapi.${ext}`));
 
   const saveUri = await vscode.window.showSaveDialog({
     defaultUri,
