@@ -90,13 +90,13 @@ export class SwaggerCodeActionProvider implements vscode.CodeActionProvider {
   ): vscode.CodeAction | null {
     const fix = new vscode.CodeAction('Add default responses', vscode.CodeActionKind.QuickFix);
 
-    const responsesSnippet = `      responses:
-        200:
-          description: Successful response
-        400:
-          description: Bad request
-        500:
-          description: Internal server error`;
+    const responsesSnippet = `    responses:
+      200:
+        description: Successful response
+      400:
+        description: Bad request
+      500:
+        description: Internal server error`;
 
     const edit = new vscode.WorkspaceEdit();
     const insertPosition = new vscode.Position(diagnostic.range.end.line, 0);
