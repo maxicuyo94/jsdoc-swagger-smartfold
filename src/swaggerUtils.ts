@@ -352,26 +352,32 @@ function prepareOpenApiDoc(parsedYaml: unknown): Record<string, unknown> | null 
 
   // Separate root-level OpenAPI properties from path definitions
   const rootProps: Record<string, unknown> = {};
-  const pathProps: Record<string, unknown> = {};
+  // Paths from nested 'paths' property (lower precedence)
+  let nestedPathProps: Record<string, unknown> = {};
+  // Paths defined at top level (higher precedence)
+  const topLevelPathProps: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(doc)) {
     const normalizedKey = key.trim();
     if (normalizedKey === 'paths') {
-      // Merge paths property into pathProps to avoid overwriting
+      // Collect paths from nested 'paths' property
       if (typeof value === 'object' && value !== null) {
-        Object.assign(pathProps, value);
+        nestedPathProps = value as Record<string, unknown>;
       }
     } else if (OPENAPI_ROOT_PROPERTIES.has(normalizedKey)) {
       // This is a root-level OpenAPI property (components, tags, etc.)
       rootProps[normalizedKey] = value;
     } else if (normalizedKey.startsWith('/')) {
-      // This is a path definition
-      pathProps[normalizedKey] = value;
+      // This is a path definition at top level
+      topLevelPathProps[normalizedKey] = value;
     } else {
       // Unknown property - treat as path for validation to catch the error
-      pathProps[normalizedKey] = value;
+      topLevelPathProps[normalizedKey] = value;
     }
   }
+
+  // Merge paths: top-level definitions take precedence over nested 'paths' property
+  const pathProps = { ...nestedPathProps, ...topLevelPathProps };
 
   // Build the OpenAPI document
   const result: Record<string, unknown> = {
