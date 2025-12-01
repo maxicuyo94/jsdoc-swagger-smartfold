@@ -84,6 +84,6 @@ El proyecto incluye pruebas unitarias y de integración configuradas con Mocha y
     *   Se abrirá brevemente una instancia de VS Code para ejecutar los tests de integración.
 
 ### Ubicación de los tests:
-*   Los archivos de prueba se encuentran en la carpeta `src/test/`.
-*   `suite/extension.test.ts`: Contiene las pruebas principales de la extensión.
+*   Los archivos de prueba se encuentran en la carpeta `test/`.
+*   `swaggerBlockDetection.test.ts`: Valida la detección y manejo de bloques `@swagger`.
 
