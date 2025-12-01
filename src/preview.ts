@@ -64,7 +64,7 @@ export async function showSwaggerPreview(_context: vscode.ExtensionContext): Pro
               tag &&
               typeof tag === 'object' &&
               'name' in tag &&
-              !tags.some((t) => (t as { name?: string }).name === tag.name)
+              !tags.some((t) => t && typeof t === 'object' && 'name' in t && t.name === tag.name)
             ) {
               tags.push(tag);
             }
@@ -76,7 +76,7 @@ export async function showSwaggerPreview(_context: vscode.ExtensionContext): Pro
               server &&
               typeof server === 'object' &&
               'url' in server &&
-              !servers.some((s) => (s as { url?: string }).url === server.url)
+              !servers.some((s) => s && typeof s === 'object' && 'url' in s && s.url === server.url)
             ) {
               servers.push(server);
             }
@@ -86,14 +86,11 @@ export async function showSwaggerPreview(_context: vscode.ExtensionContext): Pro
           for (const secReq of value) {
             if (secReq && typeof secReq === 'object') {
               const secKeys = Object.keys(secReq).sort().join(',');
-              if (
-                !security.some(
-                  (s) =>
-                    typeof s === 'object' &&
-                    s !== null &&
-                    Object.keys(s).sort().join(',') === secKeys,
-                )
-              ) {
+              const isDuplicate = security.some((s) => {
+                if (typeof s !== 'object' || s === null) return false;
+                return Object.keys(s).sort().join(',') === secKeys;
+              });
+              if (!isDuplicate) {
                 security.push(secReq);
               }
             }
