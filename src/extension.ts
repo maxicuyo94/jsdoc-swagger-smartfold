@@ -83,6 +83,14 @@ export function activate(context: vscode.ExtensionContext): void {
 
     // Preview command
     vscode.commands.registerCommand(COMMANDS.PREVIEW, () => showSwaggerPreview(context)),
+
+    // Add tags command
+    vscode.commands.registerCommand(
+      COMMANDS.ADD_TAGS,
+      async (uri: vscode.Uri, range: vscode.Range) => {
+        await handleAddTags(uri, range);
+      },
+    ),
   ];
 
   // Event: Document opened
@@ -315,6 +323,86 @@ async function handlePreviousBlock(): Promise<void> {
     const newPosition = new vscode.Position(lastBlock.range.start.line, 0);
     editor.selection = new vscode.Selection(newPosition, newPosition);
     editor.revealRange(lastBlock.range, vscode.TextEditorRevealType.InCenter);
+  }
+}
+
+/**
+ * Handles adding tags to a swagger block
+ */
+async function handleAddTags(uri: vscode.Uri, range: vscode.Range): Promise<void> {
+  const document = await vscode.workspace.openTextDocument(uri);
+  // Show the document to ensure it's visible (result not needed)
+  await vscode.window.showTextDocument(document);
+
+  // Get the swagger block content
+  const blockText = document.getText(range);
+
+  // Find the HTTP method line to insert tags after
+  const lines = blockText.split(/\r?\n/);
+  let insertLineOffset = -1;
+  let indentation = '';
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // Look for HTTP method (get, post, put, etc.)
+    const methodMatch = line.match(/^\s*\*\s+(get|post|put|patch|delete|options|head):/i);
+    if (methodMatch) {
+      insertLineOffset = i + 1;
+      // Calculate indentation (should be same level as summary, description, etc.)
+      const asteriskPos = line.indexOf('*');
+      indentation = ' '.repeat(asteriskPos + 1) + '  ';
+      break;
+    }
+  }
+
+  if (insertLineOffset === -1) {
+    vscode.window.showWarningMessage('Could not find HTTP method in swagger block');
+    return;
+  }
+
+  // Ask user for tags
+  const tagsInput = await vscode.window.showInputBox({
+    prompt: 'Enter tags separated by commas',
+    placeHolder: 'Users, Authentication, API',
+    validateInput: (value) => {
+      if (!value || value.trim().length === 0) {
+        return 'Please enter at least one tag';
+      }
+      return null;
+    },
+  });
+
+  if (!tagsInput) {
+    return; // User cancelled
+  }
+
+  // Parse and format tags
+  const tags = tagsInput
+    .split(',')
+    .map((tag) => tag.trim())
+    .filter((tag) => tag.length > 0);
+
+  if (tags.length === 0) {
+    return;
+  }
+
+  // Build the tags YAML
+  const tagsYaml =
+    `${indentation}tags:\n` + tags.map((tag) => `${indentation}  - ${tag}`).join('\n');
+
+  // Calculate the line to insert at
+  const insertLine = range.start.line + insertLineOffset;
+  const insertPosition = new vscode.Position(insertLine, 0);
+
+  // Apply the edit
+  const edit = new vscode.WorkspaceEdit();
+  edit.insert(uri, insertPosition, tagsYaml + '\n');
+
+  const success = await vscode.workspace.applyEdit(edit);
+  if (success) {
+    vscode.window.showInformationMessage(`Added tags: ${tags.join(', ')}`);
+  } else {
+    vscode.window.showErrorMessage('Failed to add tags');
   }
 }
 

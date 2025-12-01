@@ -17,6 +17,9 @@ yarn.lock
 coverage
 .nyc_output
 
+# Media folder (generated from swagger-ui-dist)
+media/
+
 # Credenciales locales (NO versionar)
 .local/
 

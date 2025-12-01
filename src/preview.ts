@@ -1,13 +1,64 @@
 import * as vscode from 'vscode';
 import { findSwaggerBlocks, parseYamlContent } from './swaggerUtils';
-import { isSupportedLanguage } from './constants';
+import { isSupportedLanguage, configManager, isFileExcluded } from './constants';
 
 let previewPanel: vscode.WebviewPanel | undefined;
 
 /**
+ * Escapes special characters for safe JSON embedding in HTML
+ * Prevents XSS by escaping characters that could break out of script context
+ */
+function escapeJsonForHtml(json: string): string {
+  return json
+    .replace(/\\/g, '\\\\') // Escape backslashes first
+    .replace(/</g, '\\u003c') // Escape < to prevent </script> injection
+    .replace(/>/g, '\\u003e') // Escape >
+    .replace(/&/g, '\\u0026') // Escape &
+    .replace(/'/g, '\\u0027') // Escape single quotes
+    .replace(/"/g, '\\u0022') // Escape double quotes (will be within template literal)
+    .replace(/\u2028/g, '\\u2028') // Line separator
+    .replace(/\u2029/g, '\\u2029'); // Paragraph separator
+}
+
+/**
+ * Sanitizes a spec object by removing potentially dangerous properties
+ */
+function sanitizeSpec(spec: Record<string, unknown>): Record<string, unknown> {
+  const sanitized = JSON.parse(JSON.stringify(spec)) as Record<string, unknown>;
+
+  // Remove any javascript: URLs or dangerous content
+  const sanitizeValue = (obj: unknown): unknown => {
+    if (typeof obj === 'string') {
+      // Remove javascript: and data: URLs
+      if (/^(javascript|data|vbscript):/i.test(obj.trim())) {
+        return '';
+      }
+      return obj;
+    }
+    if (Array.isArray(obj)) {
+      return obj.map(sanitizeValue);
+    }
+    if (obj && typeof obj === 'object') {
+      const result: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(obj)) {
+        // Skip __proto__ and constructor to prevent prototype pollution
+        if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+          continue;
+        }
+        result[key] = sanitizeValue(value);
+      }
+      return result;
+    }
+    return obj;
+  };
+
+  return sanitizeValue(sanitized) as Record<string, unknown>;
+}
+
+/**
  * Show Swagger UI preview for current file's swagger blocks
  */
-export async function showSwaggerPreview(_context: vscode.ExtensionContext): Promise<void> {
+export async function showSwaggerPreview(context: vscode.ExtensionContext): Promise<void> {
   const editor = vscode.window.activeTextEditor;
   if (!editor) {
     vscode.window.showWarningMessage('No active editor');
@@ -17,6 +68,12 @@ export async function showSwaggerPreview(_context: vscode.ExtensionContext): Pro
   const document = editor.document;
   if (!isSupportedLanguage(document.languageId)) {
     vscode.window.showWarningMessage('Current file is not a supported language');
+    return;
+  }
+
+  const excludePatterns = configManager.exclude;
+  if (excludePatterns.length > 0 && isFileExcluded(document.uri.fsPath, excludePatterns)) {
+    vscode.window.showInformationMessage('Current file is excluded by swaggerFold.exclude');
     return;
   }
 
@@ -70,7 +127,7 @@ export async function showSwaggerPreview(_context: vscode.ExtensionContext): Pro
     }
   }
 
-  const spec: Record<string, unknown> = {
+  let spec: Record<string, unknown> = {
     openapi: '3.0.3',
     info: {
       title: `${document.fileName.split(/[\\/]/).pop()} API`,
@@ -96,6 +153,9 @@ export async function showSwaggerPreview(_context: vscode.ExtensionContext): Pro
     spec.externalDocs = externalDocs;
   }
 
+  // Sanitize the spec to prevent XSS
+  spec = sanitizeSpec(spec);
+
   // Create or reveal panel
   if (previewPanel) {
     previewPanel.reveal(vscode.ViewColumn.Beside);
@@ -107,6 +167,8 @@ export async function showSwaggerPreview(_context: vscode.ExtensionContext): Pro
       {
         enableScripts: true,
         retainContextWhenHidden: true,
+        // Restrict webview to only load resources from extension's media folder
+        localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, 'media')],
       },
     );
 
@@ -115,23 +177,49 @@ export async function showSwaggerPreview(_context: vscode.ExtensionContext): Pro
     });
   }
 
-  previewPanel.webview.html = getSwaggerUIHtml(spec);
+  previewPanel.webview.html = getSwaggerUIHtml(previewPanel.webview, context.extensionUri, spec);
 }
 
 /**
- * Generate HTML with embedded Swagger UI
+ * Get URI for a media resource
  */
-function getSwaggerUIHtml(spec: object): string {
-  const specJson = JSON.stringify(spec);
+function getMediaUri(
+  webview: vscode.Webview,
+  extensionUri: vscode.Uri,
+  fileName: string,
+): vscode.Uri {
+  return webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'media', fileName));
+}
+
+/**
+ * Generate HTML with embedded Swagger UI - secured version
+ */
+function getSwaggerUIHtml(webview: vscode.Webview, extensionUri: vscode.Uri, spec: object): string {
+  // Get URIs for local resources
+  const swaggerCssUri = getMediaUri(webview, extensionUri, 'swagger-ui.css');
+  const swaggerJsUri = getMediaUri(webview, extensionUri, 'swagger-ui-bundle.js');
+
+  // Generate nonce for inline scripts (CSP requirement)
+  const nonce = getNonce();
+
+  // Serialize spec safely
+  const specJson = escapeJsonForHtml(JSON.stringify(spec));
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'none';
+    style-src ${webview.cspSource} 'unsafe-inline';
+    script-src 'nonce-${nonce}';
+    img-src ${webview.cspSource} data: https:;
+    font-src ${webview.cspSource};
+  ">
   <title>Swagger Preview</title>
-  <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
-  <style>
+  <link rel="stylesheet" type="text/css" href="${swaggerCssUri}">
+  <style nonce="${nonce}">
     html, body {
       margin: 0;
       padding: 0;
@@ -217,34 +305,61 @@ function getSwaggerUIHtml(spec: object): string {
 </head>
 <body>
   <div id="swagger-ui"></div>
-  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
-  <script>
-    const spec = ${specJson};
-    
-    if (Object.keys(spec.paths || {}).length === 0) {
-      document.getElementById('swagger-ui').innerHTML = '<div class="no-endpoints">No endpoints found in Swagger blocks</div>';
-    } else {
-      SwaggerUIBundle({
-        spec: spec,
-        dom_id: '#swagger-ui',
-        deepLinking: true,
-        presets: [
-          SwaggerUIBundle.presets.apis,
-          SwaggerUIBundle.SwaggerUIStandalonePreset
-        ],
-        layout: "BaseLayout",
-        defaultModelsExpandDepth: 1,
-        defaultModelExpandDepth: 1,
-        docExpansion: 'list',
-        filter: true,
-        showExtensions: true,
-        showCommonExtensions: true,
-        tryItOutEnabled: false
-      });
-    }
+  <script nonce="${nonce}" src="${swaggerJsUri}"></script>
+  <script nonce="${nonce}">
+    (function() {
+      'use strict';
+      
+      // Parse the safely serialized spec
+      const specJson = '${specJson}';
+      let spec;
+      
+      try {
+        spec = JSON.parse(specJson.replace(/\\\\u003c/g, '<').replace(/\\\\u003e/g, '>').replace(/\\\\u0026/g, '&').replace(/\\\\u0027/g, "'").replace(/\\\\u0022/g, '"'));
+      } catch (e) {
+        document.getElementById('swagger-ui').innerHTML = '<div class="no-endpoints">Error parsing spec: ' + e.message + '</div>';
+        return;
+      }
+      
+      if (!spec.paths || Object.keys(spec.paths).length === 0) {
+        document.getElementById('swagger-ui').innerHTML = '<div class="no-endpoints">No endpoints found in Swagger blocks</div>';
+      } else {
+        SwaggerUIBundle({
+          spec: spec,
+          dom_id: '#swagger-ui',
+          deepLinking: false, // Disabled for security
+          presets: [
+            SwaggerUIBundle.presets.apis,
+            SwaggerUIBundle.SwaggerUIStandalonePreset
+          ],
+          layout: "BaseLayout",
+          defaultModelsExpandDepth: 1,
+          defaultModelExpandDepth: 1,
+          docExpansion: 'list',
+          filter: true,
+          showExtensions: true,
+          showCommonExtensions: true,
+          tryItOutEnabled: false, // Disabled - no external requests
+          supportedSubmitMethods: [], // No submit methods allowed
+          validatorUrl: null // Disable external validator
+        });
+      }
+    })();
   </script>
 </body>
 </html>`;
+}
+
+/**
+ * Generate a cryptographically secure nonce
+ */
+function getNonce(): string {
+  let text = '';
+  const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  for (let i = 0; i < 32; i++) {
+    text += possible.charAt(Math.floor(Math.random() * possible.length));
+  }
+  return text;
 }
 
 /**
