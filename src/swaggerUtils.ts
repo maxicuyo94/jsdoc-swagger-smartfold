@@ -356,7 +356,12 @@ function prepareOpenApiDoc(parsedYaml: unknown): Record<string, unknown> | null 
 
   for (const [key, value] of Object.entries(doc)) {
     const normalizedKey = key.trim();
-    if (OPENAPI_ROOT_PROPERTIES.has(normalizedKey)) {
+    if (normalizedKey === 'paths') {
+      // Merge paths property into pathProps to avoid overwriting
+      if (typeof value === 'object' && value !== null) {
+        Object.assign(pathProps, value);
+      }
+    } else if (OPENAPI_ROOT_PROPERTIES.has(normalizedKey)) {
       // This is a root-level OpenAPI property (components, tags, etc.)
       rootProps[normalizedKey] = value;
     } else if (normalizedKey.startsWith('/')) {
