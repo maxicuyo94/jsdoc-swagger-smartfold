@@ -2,7 +2,7 @@
   "name": "jsdoc-swagger-smartfold",
   "displayName": "JSDoc Swagger SmartFold",
   "description": "Auto-fold and validate @swagger/@openapi JSDoc blocks in JavaScript/TypeScript files.",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "publisher": "maxicuyodev",
   "license": "MIT",
   "icon": "images/icon.png",
@@ -100,6 +100,12 @@
         "title": "Preview Swagger UI",
         "category": "Swagger SmartFold",
         "icon": "$(preview)"
+      },
+      {
+        "command": "swaggerFold.addTags",
+        "title": "Add Tags to Swagger Endpoint",
+        "category": "Swagger SmartFold",
+        "icon": "$(tag)"
       }
     ],
     "keybindings": [
@@ -217,7 +223,8 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run esbuild-base -- --production",
+    "vscode:prepublish": "npm run copy-swagger-ui && npm run esbuild-base -- --production",
+    "copy-swagger-ui": "node -e \"const fs=require('fs');const p=require('path');const m='media';if(!fs.existsSync(m))fs.mkdirSync(m);fs.copyFileSync(p.join('node_modules','swagger-ui-dist','swagger-ui-bundle.js'),p.join(m,'swagger-ui-bundle.js'));fs.copyFileSync(p.join('node_modules','swagger-ui-dist','swagger-ui.css'),p.join(m,'swagger-ui.css'));\"",
     "esbuild-base": "node esbuild.js",
     "esbuild": "npm run esbuild-base -- --sourcemap",
     "esbuild-watch": "npm run esbuild-base -- --sourcemap --watch",
@@ -226,7 +233,7 @@
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
     "test": "node --require ./out/test/setup.js --test \"out/test/**/*.test.js\"",
-    "package": "vsce package",
+    "package": "npm run copy-swagger-ui && vsce package",
     "publish:vs": "vsce publish",
     "publish:ovsx": "ovsx publish",
     "publish:all": "npm run publish:vs && npm run publish:ovsx",
@@ -256,6 +263,7 @@
   "dependencies": {
     "@apidevtools/swagger-parser": "^10.1.0",
     "dotenv": "^17.2.3",
-    "js-yaml": "^4.1.0"
+    "js-yaml": "^4.1.0",
+    "swagger-ui-dist": "^5.30.3"
   }
 }

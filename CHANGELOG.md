@@ -5,168 +5,85 @@ All notable changes to the **JSDoc Swagger SmartFold** extension will be documen
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.0.6] - 2024-12-01
 
 ### Added
-- (Features to be added in the next release)
+- **Add Tags Command** (`swaggerFold.addTags`) - New refactoring action to add tags to Swagger endpoints via input dialog
+- **Local Swagger UI** - Swagger UI assets are now bundled locally instead of loading from CDN, improving security and offline support
+- **Exclude Pattern Support in Export** - Export commands now respect `swaggerFold.exclude` configuration patterns
 
 ### Changed
-- (Changes to existing features)
+- **Webview Security Hardening**:
+  - Implemented strict Content Security Policy (CSP) with nonce-based script execution
+  - Added JSON serialization with XSS-safe character escaping
+  - Added spec sanitization to prevent prototype pollution and dangerous URL schemes
+  - Disabled external requests in Swagger UI
+  - Restricted webview resource loading to extension's `media/` folder
 
 ### Fixed
-- (Bug fixes)
-
-### Removed
-- (Removed features)
+- Fixed test syntax issues in `swaggerBlockDetection.test.ts`
+- Strengthened test VS Code stubs with real line/column math and added multi-block range/validation coverage to catch folding/diagnostic regressions
 
 ---
 
 ## [0.0.5] - 2024-11-29
 
 ### Fixed
-- Fixed toggle fold from CodeLens not working correctly - blocks were unfolding immediately after folding
-- CodeLens now passes the block reference directly to the toggle fold command instead of relying on cursor position
+- Fixed toggle fold from CodeLens not working correctly
+- CodeLens now passes the block reference directly to the toggle fold command
 
 ---
 
 ## [0.0.4] - 2024-11-29
 
 ### Fixed
-- Fixed OpenAPI validation error for `components` blocks: `#/paths must NOT have additional properties`
-- Root-level OpenAPI properties (`components`, `tags`, `security`, etc.) are now correctly identified and placed at document root instead of being incorrectly added to `paths`
+- Fixed OpenAPI validation error for `components` blocks
+- Root-level OpenAPI properties are now correctly placed at document root
 
 ---
 
-## [0.1.0] - 2024-XX-XX
+## [0.0.3] - 2024-11-28
 
 ### Added
-
-#### New Tag Support
 - Support for `@openapi` tag in addition to `@swagger`
-
-#### New Language Support
-- Vue (`.vue`) files support
-- Svelte (`.svelte`) files support
-
-#### New Commands
-- **Unfold Swagger Blocks** (`swaggerFold.unfoldNow`) - Unfold all Swagger blocks in the current file
-- **Toggle Fold at Cursor** (`swaggerFold.toggleFold`) - Toggle fold for the block at cursor position
-- **Go to Next Swagger Block** (`swaggerFold.nextBlock`) - Navigate to the next Swagger block
-- **Go to Previous Swagger Block** (`swaggerFold.previousBlock`) - Navigate to the previous Swagger block
-- **Export Swagger to File** (`swaggerFold.exportToFile`) - Export current file's Swagger blocks to OpenAPI document
-- **Export All Project Swagger** (`swaggerFold.exportProject`) - Export all project Swagger blocks to OpenAPI document
-- **Copy Swagger Block as JSON** (`swaggerFold.copyAsJson`) - Copy current block as JSON to clipboard
-- **Preview Swagger UI** (`swaggerFold.preview`) - Open Swagger UI preview in a side panel
-
-#### CodeLens
-- Inline endpoint information (HTTP method + path) above each Swagger block
-- Parameters count display
-- Response status codes display
-- Quick action to copy block as JSON
-
-#### Hover Preview
-- Formatted preview when hovering over `@swagger` or `@openapi` tags
-- Shows summary, description, tags, parameters, and responses
-- Truncated YAML preview for large blocks
-
-#### Quick Fixes (Code Actions)
-- Add default responses to endpoint
-- Add summary field
-- Add operationId
-- Type correction suggestions for invalid types
-
-#### Status Bar
-- Swagger block count indicator in status bar
-- Click to fold all blocks
-
-#### Export Feature
-- Export to YAML or JSON format (configurable)
-- Merge all blocks into valid OpenAPI 3.0.3 document
-- Auto-generate info section
-- Collect and merge tags from all endpoints
-- Project-wide export with progress indicator
-
-#### Swagger UI Preview
-- Live preview using Swagger UI
-- Dark theme adapted to VS Code
-- Side panel integration
-
-#### New Configuration Options
-- `swaggerFold.exclude` - Glob patterns to exclude files/folders from processing
-- `swaggerFold.validationSeverity` - Set validation error severity (`error`, `warning`, `info`)
-- `swaggerFold.autoFoldDelay` - Configurable delay before auto-folding (0-5000ms)
-- `swaggerFold.exportFormat` - Default export format (`yaml` or `json`)
-
-#### Keyboard Shortcuts
-- `Ctrl+Alt+S F` / `Cmd+Alt+S F` - Fold all blocks
-- `Ctrl+Alt+S U` / `Cmd+Alt+S U` - Unfold all blocks
-- `Ctrl+Alt+S T` / `Cmd+Alt+S T` - Toggle fold at cursor
-- `Ctrl+Alt+S ↓` / `Cmd+Alt+S ↓` - Go to next block
-- `Ctrl+Alt+S ↑` / `Cmd+Alt+S ↑` - Go to previous block
-- `Ctrl+Alt+S P` / `Cmd+Alt+S P` - Open Swagger UI preview
-
-#### Context Menu
-- Toggle Fold at Cursor
-- Copy Swagger Block as JSON
-- Preview Swagger UI
+- Vue and Svelte files support
+- CodeLens with endpoint info, parameters count, and response codes
+- Hover preview for Swagger blocks
+- Quick fixes for missing responses, summary, operationId
+- Export to YAML/JSON
+- Swagger UI preview panel
+- Navigation commands (next/previous block)
+- Status bar indicator
 
 ### Changed
-- Improved block detection to support both `@swagger` and `@openapi` tags
-- Enhanced validation with configurable severity levels
-- Better performance with optimized caching
+- Improved block detection and validation
+- Enhanced performance with caching
 
 ---
 
-## [0.0.1] - 2024-XX-XX
+## [0.0.2] - 2024-11-27
 
 ### Added
-- Initial release of JSDoc Swagger SmartFold
-- Auto-detection of `@swagger` JSDoc blocks
-- Automatic folding of Swagger blocks on file open
-- YAML syntax validation for Swagger content
-- OpenAPI 3.0 schema validation (best effort for fragments)
-- Error and warning reporting in VS Code's Problems panel
-- Manual fold command: `Swagger SmartFold: Fold Swagger Blocks`
-- Configuration option: `swaggerFold.autoFold` to toggle auto-folding
-- Configuration option: `swaggerFold.highlight` for visual distinction
+- Configuration options: `exclude`, `validationSeverity`, `autoFoldDelay`, `exportFormat`
+- Keyboard shortcuts for all commands
+- Context menu integration
+
+---
+
+## [0.0.1] - 2024-11-26
+
+### Added
+- Initial release
+- Auto-detection and folding of `@swagger` JSDoc blocks
+- YAML and OpenAPI 3.0 validation
 - Support for JavaScript, TypeScript, JSX, and TSX files
+- Configuration: `autoFold`, `highlight`
 
 ---
 
-## Version History Summary
-
-| Version | Date | Highlights |
-|---------|------|------------|
-| 0.1.0 | TBD | Major feature update: CodeLens, Hover, Quick Fixes, Export, Preview, Navigation |
-| 0.0.1 | TBD | Initial release |
-
----
-
-## Upgrade Guide
-
-### From 0.0.1 to 0.1.0
-
-No breaking changes. All new features are additive.
-
-New configuration options have sensible defaults:
-- `swaggerFold.exclude`: `[]` (no exclusions)
-- `swaggerFold.validationSeverity`: `"warning"`
-- `swaggerFold.autoFoldDelay`: `300`
-- `swaggerFold.exportFormat`: `"yaml"`
-
-### From 0.x to 1.0
-
-(To be documented when 1.0 is released)
-
----
-
-## Links
-
-- [GitHub Repository](https://github.com/tu-usuario/jsdoc-swagger-smartfold)
-- [VS Marketplace](https://marketplace.visualstudio.com/items?itemName=tu-publisher-id.jsdoc-swagger-smartfold)
-- [Open VSX](https://open-vsx.org/extension/tu-publisher-id/jsdoc-swagger-smartfold)
-- [Report Issues](https://github.com/tu-usuario/jsdoc-swagger-smartfold/issues)
-
-[Unreleased]: https://github.com/tu-usuario/jsdoc-swagger-smartfold/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/tu-usuario/jsdoc-swagger-smartfold/compare/v0.0.1...v0.1.0
-[0.0.1]: https://github.com/tu-usuario/jsdoc-swagger-smartfold/releases/tag/v0.0.1
+[0.0.6]: https://github.com/maxicuyo94/jsdoc-swagger-smartfold/compare/v0.0.5...v0.0.6
+[0.0.5]: https://github.com/maxicuyo94/jsdoc-swagger-smartfold/compare/v0.0.4...v0.0.5
+[0.0.4]: https://github.com/maxicuyo94/jsdoc-swagger-smartfold/compare/v0.0.3...v0.0.4
+[0.0.3]: https://github.com/maxicuyo94/jsdoc-swagger-smartfold/compare/v0.0.2...v0.0.3
+[0.0.2]: https://github.com/maxicuyo94/jsdoc-swagger-smartfold/compare/v0.0.1...v0.0.2
+[0.0.1]: https://github.com/maxicuyo94/jsdoc-swagger-smartfold/releases/tag/v0.0.1

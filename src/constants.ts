@@ -16,6 +16,7 @@ export const COMMANDS = {
   EXPORT_PROJECT: 'swaggerFold.exportProject',
   COPY_AS_JSON: 'swaggerFold.copyAsJson',
   PREVIEW: 'swaggerFold.preview',
+  ADD_TAGS: 'swaggerFold.addTags',
 } as const;
 
 // Configuration

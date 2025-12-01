@@ -4,39 +4,17 @@ import test from 'node:test';
 import { SwaggerCodeActionProvider } from '../src/codeActions';
 import { findSwaggerBlocks, parseYamlContent } from '../src/swaggerUtils';
 
-function positionAt(text: string, offset: number): vscode.Position {
-    const lines = text.slice(0, offset).split(/\r?\n/);
-    const line = lines.length - 1;
-    const character = lines[lines.length - 1]?.length ?? 0;
-    return new vscode.Position(line, character);
-}
-
-function offsetAt(text: string, position: vscode.Position): number {
-    const lines = text.split(/\r?\n/);
-    let offset = 0;
-
-    for (let i = 0; i < position.line; i++) {
-        offset += lines[i].length + 1;
-    }
-
-    return offset + position.character;
-}
-
 function applyTextEdit(content: string, edit: vscode.TextEdit): string {
-    const start = offsetAt(content, edit.range.start);
-    const end = offsetAt(content, edit.range.end);
+    const document = createDocument(content);
+    const start = document.offsetAt(edit.range.start);
+    const end = document.offsetAt(edit.range.end);
     return content.slice(0, start) + edit.newText + content.slice(end);
 }
 
-function createDocument(text: string): vscode.TextDocument {
-    return {
-        getText: () => text,
-        uri: vscode.Uri.parse('file:///test.ts'),
-        version: 1,
-        positionAt: (offset: number) => positionAt(text, offset),
-        languageId: 'javascript',
-    } as unknown as vscode.TextDocument;
-}
+const { testUtils } = vscode as unknown as {
+    testUtils: { createTextDocument: (text: string, uri?: string, languageId?: string) => vscode.TextDocument };
+};
+const createDocument = testUtils.createTextDocument;
 
 test('Swagger code actions - should insert a valid default responses block', () => {
     const provider = new SwaggerCodeActionProvider();

@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { COMMANDS } from './constants';
 import { findSwaggerBlocks, parseYamlContent } from './swaggerUtils';
 import { isSupportedLanguage, DIAGNOSTICS_SOURCE } from './constants';
 
@@ -187,7 +188,7 @@ export class SwaggerCodeActionProvider implements vscode.CodeActionProvider {
         vscode.CodeActionKind.Refactor,
       );
       addTagsAction.command = {
-        command: 'swaggerFold.addTags',
+        command: COMMANDS.ADD_TAGS,
         title: 'Add Tags',
         arguments: [document.uri, block.range],
       };

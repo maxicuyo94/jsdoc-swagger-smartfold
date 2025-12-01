@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as yaml from 'js-yaml';
 import * as path from 'path';
 import { findSwaggerBlocks, parseYamlContent, SwaggerBlock } from './swaggerUtils';
-import { isSupportedLanguage, configManager } from './constants';
+import { isSupportedLanguage, configManager, isFileExcluded } from './constants';
 
 interface OpenApiDocument {
   openapi: string;
@@ -36,6 +36,12 @@ export async function exportCurrentFile(): Promise<void> {
     return;
   }
 
+  const excludePatterns = configManager.exclude;
+  if (excludePatterns.length > 0 && isFileExcluded(document.uri.fsPath, excludePatterns)) {
+    vscode.window.showInformationMessage('Current file is excluded by swaggerFold.exclude');
+    return;
+  }
+
   const blocks = findSwaggerBlocks(document);
   if (blocks.length === 0) {
     vscode.window.showInformationMessage('No Swagger blocks found in current file');
@@ -56,13 +62,20 @@ export async function exportProject(): Promise<void> {
     return;
   }
 
+  const excludePatterns = configManager.exclude;
+
   // Find all supported files
   const pattern = '**/*.{js,ts,jsx,tsx,vue,svelte}';
   const excludePattern = '**/node_modules/**';
 
   const files = await vscode.workspace.findFiles(pattern, excludePattern);
 
-  if (files.length === 0) {
+  const candidateFiles =
+    excludePatterns.length === 0
+      ? files
+      : files.filter((file) => !isFileExcluded(file.fsPath, excludePatterns));
+
+  if (candidateFiles.length === 0) {
     vscode.window.showInformationMessage('No supported files found');
     return;
   }
@@ -76,18 +89,18 @@ export async function exportProject(): Promise<void> {
       cancellable: true,
     },
     async (progress, token) => {
-      for (let i = 0; i < files.length; i++) {
+      for (let i = 0; i < candidateFiles.length; i++) {
         if (token.isCancellationRequested) {
           return;
         }
 
         progress.report({
-          increment: 100 / files.length,
-          message: `${i + 1}/${files.length} files`,
+          increment: 100 / candidateFiles.length,
+          message: `${i + 1}/${candidateFiles.length} files`,
         });
 
         try {
-          const document = await vscode.workspace.openTextDocument(files[i]);
+          const document = await vscode.workspace.openTextDocument(candidateFiles[i]);
           if (isSupportedLanguage(document.languageId)) {
             const blocks = findSwaggerBlocks(document);
             allBlocks.push(...blocks);
