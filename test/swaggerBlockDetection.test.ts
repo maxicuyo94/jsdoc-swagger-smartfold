@@ -5,7 +5,7 @@ import * as vscode from 'vscode';
 describe('Swagger Block Detection', () => {
     it('should detect a swagger block', () => {
         const jsdoc = `/**\n * @swagger\n * /api/test:\n *   get:\n *     summary: Test endpoint\n */`;
-        // Simular un documento VSCode
+        // Simular un documento de VS Code
         const document = {
             getText: () => jsdoc,
             uri: { toString: () => 'test' },
