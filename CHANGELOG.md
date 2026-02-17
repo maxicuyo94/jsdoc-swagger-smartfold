@@ -5,6 +5,31 @@ All notable changes to the **JSDoc Swagger SmartFold** extension will be documen
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.7] - 2025-02-17
+
+### Security
+- **Nonce generation** — replaced `Math.random()` with `crypto.randomBytes()` for cryptographically secure CSP nonces
+- **Webview spec embedding** — switched to `<script type="application/json">` for safe OpenAPI spec serialization, eliminating eval-based injection risks
+
+### Fixed
+- **Glob matching** — `isFileExcluded` now properly escapes regex special characters (e.g. dots in `*.min.js`) before converting glob patterns
+- **LRU cache** — `DocumentCache.get()` now moves accessed entries to the end, making eviction truly least-recently-used
+- **Exporter merge** — all `components` sub-keys (schemas, parameters, responses, securitySchemes, etc.) are now merged when exporting, not just schemas
+- **Code actions indentation** — quick fixes now detect the actual JSDoc indentation instead of using hardcoded spaces
+
+### Changed
+- **`autoFoldDelay` wired up** — the `swaggerFold.autoFoldDelay` config setting now controls the validation debounce delay
+- **Debounced status bar & CodeLens** — `updateStatusBar` and `codeLensProvider.refresh` are now debounced on document change to reduce unnecessary work
+- **Unified merge logic** — extracted shared `mergeBlocksToOpenApi()` in `swaggerUtils.ts`, replacing duplicate code in `preview.ts` and `exporter.ts`
+- **`DOCUMENT_SELECTORS` constant** — eliminated duplicated language selector arrays across `codeLens.ts`, `hoverProvider.ts`, and `codeActions.ts`
+- **Removed unnecessary `async`** from `handleNextBlock` / `handlePreviousBlock` (no awaits)
+- **`dotenv` moved to devDependencies** — it is only used by `scripts/release.js`, not at runtime
+
+### Added
+- **New test suite** (`test/utils.test.ts`) — 22 tests covering `isFileExcluded`, `DocumentCache` (including LRU behavior), `debounce`, and `extractEndpointInfo`
+
+---
+
 ## [0.0.6] - 2024-12-01
 
 ### Added
@@ -81,6 +106,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+[0.0.7]: https://github.com/maxicuyo94/jsdoc-swagger-smartfold/compare/v0.0.6...v0.0.7
 [0.0.6]: https://github.com/maxicuyo94/jsdoc-swagger-smartfold/compare/v0.0.5...v0.0.6
 [0.0.5]: https://github.com/maxicuyo94/jsdoc-swagger-smartfold/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/maxicuyo94/jsdoc-swagger-smartfold/compare/v0.0.3...v0.0.4

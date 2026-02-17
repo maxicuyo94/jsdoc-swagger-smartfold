@@ -236,6 +236,119 @@ export function objectToYaml(obj: unknown): string {
   return yaml.dump(obj, { indent: 2, lineWidth: -1 });
 }
 
+export interface OpenApiDocument {
+  [key: string]: unknown;
+  openapi: string;
+  info: {
+    title: string;
+    version: string;
+    description?: string;
+  };
+  paths: Record<string, unknown>;
+  components?: Record<string, unknown>;
+  tags?: Array<{ name: string; description?: string }>;
+  servers?: unknown[];
+  security?: unknown[];
+  externalDocs?: unknown;
+}
+
+/**
+ * Merge multiple swagger blocks into a single OpenAPI document.
+ * Shared logic used by both exporter and preview.
+ */
+export function mergeBlocksToOpenApi(blocks: SwaggerBlock[], title: string): OpenApiDocument {
+  const paths: Record<string, unknown> = {};
+  const components: Record<string, unknown> = {};
+  const tagsSet = new Set<string>();
+  const servers: unknown[] = [];
+  const security: unknown[] = [];
+  let externalDocs: unknown = undefined;
+
+  for (const block of blocks) {
+    const parsed = parseYamlContent(block.yamlContent);
+    if (!parsed) {
+      continue;
+    }
+
+    for (const [key, value] of Object.entries(parsed)) {
+      if (key.startsWith('/')) {
+        // Path definition — merge methods if path already exists
+        if (paths[key]) {
+          paths[key] = { ...(paths[key] as object), ...(value as object) };
+        } else {
+          paths[key] = value;
+        }
+
+        // Collect tags from method definitions
+        if (typeof value === 'object' && value !== null) {
+          for (const method of Object.values(value as Record<string, unknown>)) {
+            if (typeof method === 'object' && method !== null) {
+              const methodDef = method as Record<string, unknown>;
+              if (Array.isArray(methodDef.tags)) {
+                methodDef.tags.forEach((tag: string) => tagsSet.add(tag));
+              }
+            }
+          }
+        }
+      } else if (key === 'components' && typeof value === 'object' && value !== null) {
+        // Merge all component sub-keys (schemas, parameters, responses, securitySchemes, etc.)
+        for (const [compKey, compValue] of Object.entries(value as Record<string, unknown>)) {
+          if (components[compKey] && typeof components[compKey] === 'object') {
+            components[compKey] = {
+              ...(components[compKey] as object),
+              ...(compValue as object),
+            };
+          } else {
+            components[compKey] = compValue;
+          }
+        }
+      } else if (key === 'tags' && Array.isArray(value)) {
+        value.forEach((t: unknown) => {
+          if (typeof t === 'object' && t !== null && 'name' in t) {
+            tagsSet.add((t as { name: string }).name);
+          } else if (typeof t === 'string') {
+            tagsSet.add(t);
+          }
+        });
+      } else if (key === 'servers' && Array.isArray(value)) {
+        servers.push(...value);
+      } else if (key === 'security' && Array.isArray(value)) {
+        security.push(...value);
+      } else if (key === 'externalDocs') {
+        externalDocs = value;
+      }
+    }
+  }
+
+  const doc: OpenApiDocument = {
+    openapi: '3.0.3',
+    info: {
+      title: `${title} API`,
+      version: '1.0.0',
+      description: `API documentation generated from ${blocks.length} Swagger block${blocks.length !== 1 ? 's' : ''}`,
+    },
+    paths,
+  };
+
+  if (Object.keys(components).length > 0) {
+    doc.components = components;
+  }
+  if (tagsSet.size > 0) {
+    doc.tags = Array.from(tagsSet).map((name) => ({ name }));
+  }
+  if (servers.length > 0) {
+    doc.servers = servers;
+  }
+  if (security.length > 0) {
+    doc.security = security;
+  }
+  if (externalDocs) {
+    doc.externalDocs = externalDocs;
+  }
+
+  return doc;
+}
+
 /**
  * Validates YAML syntax and basic OpenAPI structure for all blocks.
  */
