@@ -16,8 +16,8 @@ import {
 } from './constants';
 import { debounce } from './utils';
 
-// Debounce delay in milliseconds
-const VALIDATION_DEBOUNCE_MS = 300;
+// Debounce delay in milliseconds (fallbacks if config not available)
+const DEFAULT_VALIDATION_DEBOUNCE_MS = 300;
 const DECORATION_DEBOUNCE_MS = 150;
 
 let diagnosticCollection: vscode.DiagnosticCollection;
@@ -26,6 +26,8 @@ let codeLensProvider: SwaggerCodeLensProvider;
 // Debounced functions (initialized in activate)
 let debouncedValidation: ReturnType<typeof debounce<(doc: vscode.TextDocument) => void>>;
 let debouncedDecoration: ReturnType<typeof debounce<(editor: vscode.TextEditor) => void>>;
+let debouncedStatusBar: ReturnType<typeof debounce<() => void>>;
+let debouncedCodeLensRefresh: ReturnType<typeof debounce<() => void>>;
 
 export function activate(context: vscode.ExtensionContext): void {
   // Initialize configuration manager
@@ -50,13 +52,22 @@ export function activate(context: vscode.ExtensionContext): void {
   // Initialize Status Bar
   activateStatusBar(context);
 
-  // Create debounced functions
+  // Create debounced functions (use autoFoldDelay config for validation debounce)
+  const validationDelay = configManager.autoFoldDelay || DEFAULT_VALIDATION_DEBOUNCE_MS;
   debouncedValidation = debounce((doc: vscode.TextDocument) => {
     triggerValidation(doc);
-  }, VALIDATION_DEBOUNCE_MS);
+  }, validationDelay);
 
   debouncedDecoration = debounce((editor: vscode.TextEditor) => {
     updateDecorations(editor);
+  }, DECORATION_DEBOUNCE_MS);
+
+  debouncedStatusBar = debounce(() => {
+    updateStatusBar();
+  }, DECORATION_DEBOUNCE_MS);
+
+  debouncedCodeLensRefresh = debounce(() => {
+    codeLensProvider.refresh();
   }, DECORATION_DEBOUNCE_MS);
 
   // Register commands
@@ -116,11 +127,11 @@ export function activate(context: vscode.ExtensionContext): void {
       debouncedDecoration(editor);
     }
 
-    // Update status bar
-    updateStatusBar();
+    // Debounced status bar update
+    debouncedStatusBar();
 
-    // Refresh CodeLens
-    codeLensProvider.refresh();
+    // Debounced CodeLens refresh
+    debouncedCodeLensRefresh();
   });
 
   // Event: Document closed (cleanup cache)
@@ -155,6 +166,8 @@ export function deactivate(): void {
   // Cancel pending debounced calls
   debouncedValidation?.cancel();
   debouncedDecoration?.cancel();
+  debouncedStatusBar?.cancel();
+  debouncedCodeLensRefresh?.cancel();
 
   // Dispose status bar
   disposeStatusBar();
@@ -255,7 +268,7 @@ async function handleToggleFold(block?: SwaggerBlock): Promise<void> {
   }
 }
 
-async function handleNextBlock(): Promise<void> {
+function handleNextBlock(): void {
   const editor = vscode.window.activeTextEditor;
   if (!editor) {
     return;
@@ -290,7 +303,7 @@ async function handleNextBlock(): Promise<void> {
   }
 }
 
-async function handlePreviousBlock(): Promise<void> {
+function handlePreviousBlock(): void {
   const editor = vscode.window.activeTextEditor;
   if (!editor) {
     return;

@@ -249,8 +249,9 @@ The exported document includes:
 *   OpenAPI 3.0.3 specification
 *   Auto-generated info section
 *   All paths merged from blocks
-*   Components/schemas if defined
+*   Components (schemas, parameters, responses, securitySchemes, etc.) if defined
 *   Tags collected from all endpoints
+*   Servers, security, and externalDocs if present
 
 ---
 
@@ -340,6 +341,7 @@ Or in VS Code:
 | `npm run publish:vs` | Publish to VS Marketplace |
 | `npm run publish:ovsx` | Publish to Open VSX |
 | `npm run publish:all` | Publish to both marketplaces |
+| `npm test` | Run tests (compile + lint + node test runner) |
 
 ### Project Structure
 
@@ -347,7 +349,7 @@ Or in VS Code:
 src/
 ├── extension.ts      # Main extension entry point
 ├── constants.ts      # Constants, commands, and configuration
-├── swaggerUtils.ts   # Swagger block detection and validation
+├── swaggerUtils.ts   # Swagger block detection, validation, and merge logic
 ├── decorator.ts      # Visual decorations for blocks
 ├── codeLens.ts       # CodeLens provider
 ├── hoverProvider.ts  # Hover information provider
@@ -355,7 +357,12 @@ src/
 ├── statusBar.ts      # Status bar indicator
 ├── exporter.ts       # Export functionality
 ├── preview.ts        # Swagger UI preview webview
-└── utils.ts          # Utility functions
+└── utils.ts          # Utility functions (debounce, LRU cache)
+test/
+├── setup.ts                      # Mock vscode module for tests
+├── swaggerBlockDetection.test.ts # Block detection & validation tests
+├── codeActions.test.ts           # Code actions tests
+└── utils.test.ts                 # Glob matching, cache, debounce, endpoint info tests
 ```
 
 ---

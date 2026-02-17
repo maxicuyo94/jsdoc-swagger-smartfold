@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { COMMANDS } from './constants';
 import { findSwaggerBlocks, parseYamlContent } from './swaggerUtils';
-import { isSupportedLanguage, DIAGNOSTICS_SOURCE } from './constants';
+import { isSupportedLanguage, DIAGNOSTICS_SOURCE, DOCUMENT_SELECTORS } from './constants';
 
 /**
  * Code Action provider for Swagger blocks
@@ -85,23 +85,51 @@ export class SwaggerCodeActionProvider implements vscode.CodeActionProvider {
     return fixes;
   }
 
+  /**
+   * Detect the indentation used in the JSDoc block near the diagnostic line.
+   * Returns the leading whitespace + asterisk prefix (e.g., " *   ") for the
+   * property level, and a deeper level for nested values.
+   */
+  private detectIndentation(
+    document: vscode.TextDocument,
+    line: number,
+  ): { property: string; nested: string } {
+    // Scan the diagnostic line and up to 5 lines above to find a YAML content line
+    // (one with " * key:" pattern) for reliable indentation detection.
+    const safeLine = Math.min(line, document.lineCount - 1);
+    for (let i = safeLine; i >= Math.max(0, safeLine - 5); i--) {
+      const text = document.lineAt(i).text;
+      // Match a line like " *   get:" or " *     summary: ..."
+      const contentMatch = text.match(/^(\s*\*\s+)\S/);
+      if (contentMatch) {
+        const base = contentMatch[1];
+        return { property: base, nested: base + '  ' };
+      }
+    }
+    // Fallback: use standard JSDoc indentation
+    return { property: ' *     ', nested: ' *       ' };
+  }
+
   private createAddResponsesFix(
     document: vscode.TextDocument,
     diagnostic: vscode.Diagnostic,
   ): vscode.CodeAction | null {
     const fix = new vscode.CodeAction('Add default responses', vscode.CodeActionKind.QuickFix);
 
-    const responsesSnippet = `    responses:
-      200:
-        description: Successful response
-      400:
-        description: Bad request
-      500:
-        description: Internal server error`;
+    const { property, nested } = this.detectIndentation(document, diagnostic.range.end.line);
+    const deep = nested + '  ';
+    const responsesSnippet =
+      `${property}responses:\n` +
+      `${nested}200:\n` +
+      `${deep}description: Successful response\n` +
+      `${nested}400:\n` +
+      `${deep}description: Bad request\n` +
+      `${nested}500:\n` +
+      `${deep}description: Internal server error\n`;
 
     const edit = new vscode.WorkspaceEdit();
     const insertPosition = new vscode.Position(diagnostic.range.end.line, 0);
-    edit.insert(document.uri, insertPosition, responsesSnippet + '\n');
+    edit.insert(document.uri, insertPosition, responsesSnippet);
 
     fix.edit = edit;
     fix.diagnostics = [diagnostic];
@@ -116,9 +144,10 @@ export class SwaggerCodeActionProvider implements vscode.CodeActionProvider {
   ): vscode.CodeAction | null {
     const fix = new vscode.CodeAction('Add summary field', vscode.CodeActionKind.QuickFix);
 
+    const { nested } = this.detectIndentation(document, diagnostic.range.start.line);
     const edit = new vscode.WorkspaceEdit();
     const insertPosition = new vscode.Position(diagnostic.range.start.line + 1, 0);
-    edit.insert(document.uri, insertPosition, '        summary: TODO: Add summary\n');
+    edit.insert(document.uri, insertPosition, `${nested}summary: TODO: Add summary\n`);
 
     fix.edit = edit;
     fix.diagnostics = [diagnostic];
@@ -132,9 +161,10 @@ export class SwaggerCodeActionProvider implements vscode.CodeActionProvider {
   ): vscode.CodeAction | null {
     const fix = new vscode.CodeAction('Add operationId', vscode.CodeActionKind.QuickFix);
 
+    const { nested } = this.detectIndentation(document, diagnostic.range.start.line);
     const edit = new vscode.WorkspaceEdit();
     const insertPosition = new vscode.Position(diagnostic.range.start.line + 1, 0);
-    edit.insert(document.uri, insertPosition, '        operationId: myOperation\n');
+    edit.insert(document.uri, insertPosition, `${nested}operationId: myOperation\n`);
 
     fix.edit = edit;
     fix.diagnostics = [diagnostic];
@@ -206,14 +236,7 @@ export function activateCodeActions(context: vscode.ExtensionContext): void {
   const provider = new SwaggerCodeActionProvider();
 
   const disposable = vscode.languages.registerCodeActionsProvider(
-    [
-      { language: 'javascript' },
-      { language: 'typescript' },
-      { language: 'javascriptreact' },
-      { language: 'typescriptreact' },
-      { language: 'vue' },
-      { language: 'svelte' },
-    ],
+    [...DOCUMENT_SELECTORS],
     provider,
     {
       providedCodeActionKinds: SwaggerCodeActionProvider.providedCodeActionKinds,

@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { findSwaggerBlocks, SwaggerBlock } from './swaggerUtils';
-import { isSupportedLanguage, COMMANDS } from './constants';
+import { isSupportedLanguage, COMMANDS, DOCUMENT_SELECTORS } from './constants';
 
 /**
  * CodeLens provider for Swagger blocks
@@ -109,17 +109,7 @@ export class SwaggerCodeLensProvider implements vscode.CodeLensProvider {
 export function activateCodeLens(context: vscode.ExtensionContext): SwaggerCodeLensProvider {
   const provider = new SwaggerCodeLensProvider();
 
-  const disposable = vscode.languages.registerCodeLensProvider(
-    [
-      { language: 'javascript' },
-      { language: 'typescript' },
-      { language: 'javascriptreact' },
-      { language: 'typescriptreact' },
-      { language: 'vue' },
-      { language: 'svelte' },
-    ],
-    provider,
-  );
+  const disposable = vscode.languages.registerCodeLensProvider([...DOCUMENT_SELECTORS], provider);
 
   context.subscriptions.push(disposable);
 

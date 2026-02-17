@@ -46,11 +46,49 @@ export const SUPPORTED_LANGUAGES = new Set([
 // HTTP Methods for display
 export const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete', 'options', 'head'] as const;
 
+// Document selectors for registering providers
+export const DOCUMENT_SELECTORS = [
+  { language: 'javascript' },
+  { language: 'typescript' },
+  { language: 'javascriptreact' },
+  { language: 'typescriptreact' },
+  { language: 'vue' },
+  { language: 'svelte' },
+] as const;
+
 /**
  * Check if a language is supported by this extension
  */
 export function isSupportedLanguage(languageId: string): boolean {
   return SUPPORTED_LANGUAGES.has(languageId);
+}
+
+/**
+ * Escape regex special characters except glob wildcards (* and ?)
+ */
+function escapeRegexChars(str: string): string {
+  return str.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Convert a glob pattern to a RegExp.
+ * Supports **, *, and ? wildcards.
+ */
+function globToRegex(pattern: string): RegExp {
+  // Split on ** first, then handle * and ? in each segment
+  const parts = pattern.split('**');
+  const regexParts = parts.map((part) => {
+    // Split on * to handle single-star segments
+    return part
+      .split('*')
+      .map((segment) => {
+        // Escape regex chars, then replace ? with single-char wildcard
+        return escapeRegexChars(segment).replace(/\?/g, '.');
+      })
+      .join('[^/]*');
+  });
+
+  return new RegExp(regexParts.join('.*'));
 }
 
 /**
@@ -64,10 +102,7 @@ export function isFileExcluded(filePath: string, excludePatterns: string[]): boo
   const normalizedPath = filePath.replace(/\\/g, '/');
 
   for (const pattern of excludePatterns) {
-    // Simple glob matching for common patterns
-    const regexPattern = pattern.replace(/\*\*/g, '.*').replace(/\*/g, '[^/]*').replace(/\?/g, '.');
-
-    const regex = new RegExp(regexPattern);
+    const regex = globToRegex(pattern);
     if (regex.test(normalizedPath)) {
       return true;
     }

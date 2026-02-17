@@ -1,24 +1,14 @@
 import * as vscode from 'vscode';
 import * as yaml from 'js-yaml';
 import * as path from 'path';
-import { findSwaggerBlocks, parseYamlContent, SwaggerBlock } from './swaggerUtils';
+import {
+  findSwaggerBlocks,
+  parseYamlContent,
+  SwaggerBlock,
+  mergeBlocksToOpenApi,
+  OpenApiDocument,
+} from './swaggerUtils';
 import { isSupportedLanguage, configManager, isFileExcluded } from './constants';
-
-interface OpenApiDocument {
-  openapi: string;
-  info: {
-    title: string;
-    version: string;
-    description?: string;
-  };
-  paths: Record<string, unknown>;
-  components?: {
-    schemas?: Record<string, unknown>;
-    parameters?: Record<string, unknown>;
-    responses?: Record<string, unknown>;
-  };
-  tags?: Array<{ name: string; description?: string }>;
-}
 
 /**
  * Export all swagger blocks from current file to a single OpenAPI document
@@ -120,75 +110,6 @@ export async function exportProject(): Promise<void> {
   const projectName = workspaceFolders[0].name;
   const openApiDoc = mergeBlocksToOpenApi(allBlocks, projectName);
   await saveOpenApiDocument(openApiDoc, workspaceFolders[0].uri.fsPath);
-}
-
-/**
- * Merge multiple swagger blocks into a single OpenAPI document
- */
-function mergeBlocksToOpenApi(blocks: SwaggerBlock[], title: string): OpenApiDocument {
-  const paths: Record<string, unknown> = {};
-  const schemas: Record<string, unknown> = {};
-  const tagsSet = new Set<string>();
-
-  for (const block of blocks) {
-    const parsed = parseYamlContent(block.yamlContent);
-    if (!parsed) {
-      continue;
-    }
-
-    // Merge paths
-    for (const [key, value] of Object.entries(parsed)) {
-      if (key.startsWith('/')) {
-        // Path definition
-        if (paths[key]) {
-          // Merge methods
-          paths[key] = { ...(paths[key] as object), ...(value as object) };
-        } else {
-          paths[key] = value;
-        }
-
-        // Collect tags
-        if (typeof value === 'object' && value !== null) {
-          for (const method of Object.values(value as Record<string, unknown>)) {
-            if (typeof method === 'object' && method !== null) {
-              const methodDef = method as Record<string, unknown>;
-              if (Array.isArray(methodDef.tags)) {
-                methodDef.tags.forEach((tag: string) => tagsSet.add(tag));
-              }
-            }
-          }
-        }
-      } else if (key === 'components') {
-        // Merge components
-        const components = value as Record<string, unknown>;
-        if (components.schemas) {
-          Object.assign(schemas, components.schemas);
-        }
-      }
-    }
-  }
-
-  const doc: OpenApiDocument = {
-    openapi: '3.0.3',
-    info: {
-      title: `${title} API`,
-      version: '1.0.0',
-      description: `API documentation generated from ${blocks.length} Swagger blocks`,
-    },
-    paths,
-  };
-
-  // Add components if any schemas were found
-  if (Object.keys(schemas).length > 0) {
-    doc.components = { schemas };
-  }
-
-  // Add tags
-  if (tagsSet.size > 0) {
-    doc.tags = Array.from(tagsSet).map((name) => ({ name }));
-  }
-
-  return doc;
 }
 
 /**
