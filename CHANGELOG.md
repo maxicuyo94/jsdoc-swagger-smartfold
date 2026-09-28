@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Minimum VS Code version is now 1.90** (Node.js 20 runtime)
 - `swaggerFold.exclude` now uses real glob matching (minimatch): `**` spans multiple folders, dots are literal, bare folder names like `dist` exclude their contents, and Windows paths are matched case-insensitively
 
+### Fixed
+- VSIX package now ships only the esbuild bundle (`out/extension.js`); stray `tsc` output and compiled tests are no longer included
+
 ### Security
 - OpenAPI validation no longer resolves external `$ref`s (no file reads or network requests triggered by workspace content)
 - Hover previews no longer render workspace content as trusted Markdown

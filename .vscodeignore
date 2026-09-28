@@ -1,10 +1,14 @@
 # Archivos y carpetas a excluir del paquete .vsix
 # Esto reduce el tamaño del paquete y mejora los tiempos de instalación
 
-# Código fuente (solo se necesita el código compilado en /out)
+# Código fuente (solo se necesita el bundle de esbuild)
 src/**
 **/*.ts
-!out/**/*.js
+
+# Salida de compilación: solo out/extension.js (bundle). tsc deja out/src/**,
+# out/test/** y archivos sueltos de builds anteriores que no deben empaquetarse.
+out/**
+!out/extension.js
 
 # Configuración de desarrollo
 .vscode/**
