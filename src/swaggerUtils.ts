@@ -357,14 +357,20 @@ export async function validateSwagger(blocks: SwaggerBlock[]): Promise<vscode.Di
     return [];
   }
 
+  // Components defined in any block of the file, so `$ref`s between blocks resolve
+  const sharedComponents = mergeBlocksToOpenApi(blocks, '').components ?? {};
+
   // Validate all blocks in parallel for better performance
-  const results = await Promise.all(blocks.map(validateBlock));
+  const results = await Promise.all(blocks.map((block) => validateBlock(block, sharedComponents)));
 
   // Filter out null results
   return results.filter((d): d is vscode.Diagnostic => d !== null);
 }
 
-async function validateBlock(block: SwaggerBlock): Promise<vscode.Diagnostic | null> {
+async function validateBlock(
+  block: SwaggerBlock,
+  sharedComponents: Record<string, unknown>,
+): Promise<vscode.Diagnostic | null> {
   // 1. Validate YAML Syntax
   let parsedYaml: unknown;
   try {
@@ -393,7 +399,9 @@ async function validateBlock(block: SwaggerBlock): Promise<vscode.Diagnostic | n
     // Never resolve external $refs: validation runs on every edit and must not
     // read arbitrary files or make network requests on behalf of workspace content.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await SwaggerParser.validate(docToValidate as any, { resolve: { external: false } });
+    await SwaggerParser.validate(withSharedComponents(docToValidate, sharedComponents) as any, {
+      resolve: { external: false },
+    });
   } catch (err: unknown) {
     return createOpenApiErrorDiagnostic(block, err);
   }
@@ -495,4 +503,89 @@ function prepareOpenApiDoc(parsedYaml: unknown): Record<string, unknown> | null 
   };
 
   return result;
+}
+
+const COMPONENT_REF_PREFIX = '#/components/';
+
+/**
+ * Minimal valid definitions used for `$ref`s to components that are not
+ * defined in the current file. With swagger-jsdoc, components usually live in
+ * other files, so a file-level validator cannot tell them apart from typos.
+ */
+const COMPONENT_STUBS: Record<string, (name: string) => unknown> = {
+  schemas: () => ({}),
+  responses: () => ({ description: '' }),
+  parameters: (name) => ({ name, in: 'query', schema: {} }),
+  requestBodies: () => ({ content: {} }),
+  headers: () => ({ schema: {} }),
+  examples: () => ({}),
+  links: () => ({}),
+  callbacks: () => ({}),
+  securitySchemes: () => ({ type: 'http', scheme: 'bearer' }),
+};
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+/**
+ * Returns a copy of `doc` whose components include those shared by the whole
+ * file (the block's own definitions win) plus stubs for any other
+ * `#/components/...` reference. The copy is deep so SwaggerParser, which
+ * dereferences in place, never mutates the shared objects.
+ */
+function withSharedComponents(
+  doc: Record<string, unknown>,
+  sharedComponents: Record<string, unknown>,
+): Record<string, unknown> {
+  const ownComponents = asRecord(doc.components);
+  const components: Record<string, Record<string, unknown>> = {};
+
+  for (const section of new Set([
+    ...Object.keys(sharedComponents),
+    ...Object.keys(ownComponents),
+  ])) {
+    components[section] = {
+      ...asRecord(sharedComponents[section]),
+      ...asRecord(ownComponents[section]),
+    };
+  }
+
+  for (const ref of collectComponentRefs(doc)) {
+    const [section, name] = ref
+      .slice(COMPONENT_REF_PREFIX.length)
+      .split('/')
+      .map((segment) => segment.replace(/~1/g, '/').replace(/~0/g, '~'));
+    const createStub = COMPONENT_STUBS[section];
+    if (!name || !createStub) {
+      continue;
+    }
+    components[section] ??= {};
+    if (!(name in components[section])) {
+      components[section][name] = createStub(name);
+    }
+  }
+
+  const result = { ...doc };
+  if (Object.keys(components).length > 0) {
+    result.components = components;
+  }
+  return structuredClone(result);
+}
+
+function collectComponentRefs(value: unknown, refs = new Set<string>()): Set<string> {
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectComponentRefs(item, refs));
+  } else if (typeof value === 'object' && value !== null) {
+    for (const [key, child] of Object.entries(value)) {
+      if (key === '$ref' && typeof child === 'string' && child.startsWith(COMPONENT_REF_PREFIX)) {
+        refs.add(child);
+      } else {
+        collectComponentRefs(child, refs);
+      }
+    }
+  }
+  return refs;
 }

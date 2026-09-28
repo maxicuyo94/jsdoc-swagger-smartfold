@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `swaggerFold.exclude` now uses real glob matching (minimatch): `**` spans multiple folders, dots are literal, bare folder names like `dist` exclude their contents, and Windows paths are matched case-insensitively
 
 ### Fixed
+- **No more false `$ref` errors between blocks**: each block is validated with the `components` defined anywhere in the same file, and references to components defined in other files are no longer reported as unresolved
 - VSIX package now ships only the esbuild bundle (`out/extension.js`); stray `tsc` output and compiled tests are no longer included
 
 ### Security
