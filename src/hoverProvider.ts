@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { findSwaggerBlocks, SwaggerBlock } from './swaggerUtils';
-import { isSupportedLanguage, SWAGGER_TAGS } from './constants';
+import { isSupportedLanguage, SWAGGER_TAGS, DOCUMENT_SELECTORS } from './constants';
 
 /**
  * Hover provider for Swagger blocks
@@ -98,17 +98,7 @@ export class SwaggerHoverProvider implements vscode.HoverProvider {
 export function activateHoverProvider(context: vscode.ExtensionContext): void {
   const provider = new SwaggerHoverProvider();
 
-  const disposable = vscode.languages.registerHoverProvider(
-    [
-      { language: 'javascript' },
-      { language: 'typescript' },
-      { language: 'javascriptreact' },
-      { language: 'typescriptreact' },
-      { language: 'vue' },
-      { language: 'svelte' },
-    ],
-    provider,
-  );
+  const disposable = vscode.languages.registerHoverProvider([...DOCUMENT_SELECTORS], provider);
 
   context.subscriptions.push(disposable);
 }

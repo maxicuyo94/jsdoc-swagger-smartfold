@@ -47,6 +47,16 @@ export const SUPPORTED_LANGUAGES = new Set([
 // HTTP Methods for display
 export const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete', 'options', 'head'] as const;
 
+// Document selectors for registering providers
+export const DOCUMENT_SELECTORS = [
+  { language: 'javascript' },
+  { language: 'typescript' },
+  { language: 'javascriptreact' },
+  { language: 'typescriptreact' },
+  { language: 'vue' },
+  { language: 'svelte' },
+] as const;
+
 /**
  * Check if a language is supported by this extension
  */

@@ -1,23 +1,16 @@
 import * as vscode from 'vscode';
-import { findSwaggerBlocks, parseYamlContent } from './swaggerUtils';
+import * as crypto from 'crypto';
+import { findSwaggerBlocks, mergeBlocksToOpenApi } from './swaggerUtils';
 import { isSupportedLanguage, configManager, isFileExcluded } from './constants';
 
 let previewPanel: vscode.WebviewPanel | undefined;
 
 /**
- * Escapes special characters for safe JSON embedding in HTML
- * Prevents XSS by escaping characters that could break out of script context
+ * Escapes JSON for safe embedding inside a <script type="application/json"> tag.
+ * Only need to prevent "</script>" from appearing in the content.
  */
 function escapeJsonForHtml(json: string): string {
-  return json
-    .replace(/\\/g, '\\\\') // Escape backslashes first
-    .replace(/</g, '\\u003c') // Escape < to prevent </script> injection
-    .replace(/>/g, '\\u003e') // Escape >
-    .replace(/&/g, '\\u0026') // Escape &
-    .replace(/'/g, '\\u0027') // Escape single quotes
-    .replace(/"/g, '\\u0022') // Escape double quotes (will be within template literal)
-    .replace(/\u2028/g, '\\u2028') // Line separator
-    .replace(/\u2029/g, '\\u2029'); // Paragraph separator
+  return json.replace(/<\//g, '<\\/');
 }
 
 /**
@@ -83,75 +76,9 @@ export async function showSwaggerPreview(context: vscode.ExtensionContext): Prom
     return;
   }
 
-  // Merge blocks into OpenAPI spec
-  const paths: Record<string, unknown> = {};
-  const components: Record<string, unknown> = {};
-  const tags: unknown[] = [];
-  const servers: unknown[] = [];
-  const security: unknown[] = [];
-  let externalDocs: unknown = undefined;
-
-  for (const block of blocks) {
-    const parsed = parseYamlContent(block.yamlContent);
-    if (parsed) {
-      for (const [key, value] of Object.entries(parsed)) {
-        if (key.startsWith('/')) {
-          // Path definition
-          if (paths[key]) {
-            paths[key] = { ...(paths[key] as object), ...(value as object) };
-          } else {
-            paths[key] = value;
-          }
-        } else if (key === 'components' && typeof value === 'object' && value !== null) {
-          // Merge components (schemas, responses, parameters, etc.)
-          for (const [compKey, compValue] of Object.entries(value as Record<string, unknown>)) {
-            if (components[compKey] && typeof components[compKey] === 'object') {
-              components[compKey] = {
-                ...(components[compKey] as object),
-                ...(compValue as object),
-              };
-            } else {
-              components[compKey] = compValue;
-            }
-          }
-        } else if (key === 'tags' && Array.isArray(value)) {
-          tags.push(...value);
-        } else if (key === 'servers' && Array.isArray(value)) {
-          servers.push(...value);
-        } else if (key === 'security' && Array.isArray(value)) {
-          security.push(...value);
-        } else if (key === 'externalDocs') {
-          externalDocs = value;
-        }
-      }
-    }
-  }
-
-  let spec: Record<string, unknown> = {
-    openapi: '3.0.3',
-    info: {
-      title: `${document.fileName.split(/[\\/]/).pop()} API`,
-      version: '1.0.0',
-    },
-    paths,
-  };
-
-  // Add optional root-level properties if they exist
-  if (Object.keys(components).length > 0) {
-    spec.components = components;
-  }
-  if (tags.length > 0) {
-    spec.tags = tags;
-  }
-  if (servers.length > 0) {
-    spec.servers = servers;
-  }
-  if (security.length > 0) {
-    spec.security = security;
-  }
-  if (externalDocs) {
-    spec.externalDocs = externalDocs;
-  }
+  // Merge blocks into OpenAPI spec using shared logic
+  const fileName = document.fileName.split(/[\\/]/).pop() ?? 'Untitled';
+  let spec: Record<string, unknown> = mergeBlocksToOpenApi(blocks, fileName);
 
   // Sanitize the spec to prevent XSS
   spec = sanitizeSpec(spec);
@@ -202,7 +129,7 @@ function getSwaggerUIHtml(webview: vscode.Webview, extensionUri: vscode.Uri, spe
   // Generate nonce for inline scripts (CSP requirement)
   const nonce = getNonce();
 
-  // Serialize spec safely
+  // Serialize spec safely for embedding in application/json script tag
   const specJson = escapeJsonForHtml(JSON.stringify(spec));
 
   return `<!DOCTYPE html>
@@ -305,17 +232,16 @@ function getSwaggerUIHtml(webview: vscode.Webview, extensionUri: vscode.Uri, spe
 </head>
 <body>
   <div id="swagger-ui"></div>
+  <script type="application/json" id="swagger-spec">${specJson}</script>
   <script nonce="${nonce}" src="${swaggerJsUri}"></script>
   <script nonce="${nonce}">
     (function() {
       'use strict';
       
-      // Parse the safely serialized spec
-      const specJson = '${specJson}';
+      // Parse the spec from the application/json script tag (safe, no eval)
       let spec;
-      
       try {
-        spec = JSON.parse(specJson.replace(/\\\\u003c/g, '<').replace(/\\\\u003e/g, '>').replace(/\\\\u0026/g, '&').replace(/\\\\u0027/g, "'").replace(/\\\\u0022/g, '"'));
+        spec = JSON.parse(document.getElementById('swagger-spec').textContent);
       } catch (e) {
         document.getElementById('swagger-ui').innerHTML = '<div class="no-endpoints">Error parsing spec: ' + e.message + '</div>';
         return;
@@ -354,12 +280,7 @@ function getSwaggerUIHtml(webview: vscode.Webview, extensionUri: vscode.Uri, spe
  * Generate a cryptographically secure nonce
  */
 function getNonce(): string {
-  let text = '';
-  const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  for (let i = 0; i < 32; i++) {
-    text += possible.charAt(Math.floor(Math.random() * possible.length));
-  }
-  return text;
+  return crypto.randomBytes(16).toString('hex');
 }
 
 /**

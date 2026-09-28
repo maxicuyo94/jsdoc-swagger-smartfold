@@ -44,6 +44,9 @@ export class DocumentCache<T> {
   get(uri: string, version: number): T | undefined {
     const entry = this.cache.get(uri);
     if (entry?.version === version) {
+      // Move to end to maintain LRU order
+      this.cache.delete(uri);
+      this.cache.set(uri, entry);
       return entry.data;
     }
     return undefined;
