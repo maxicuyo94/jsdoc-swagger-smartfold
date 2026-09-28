@@ -118,11 +118,29 @@ function processCommentBlock(
   fullComment: string,
   startIndex: number,
 ): SwaggerBlock | null {
-  const endIndex = startIndex + fullComment.length;
-  const startPos = document.positionAt(startIndex);
-  const endPos = document.positionAt(endIndex);
-  const range = new vscode.Range(startPos, endPos);
+  const extracted = extractYamlFromComment(fullComment);
+  if (!extracted) {
+    return null;
+  }
 
+  const startPos = document.positionAt(startIndex);
+  const endPos = document.positionAt(startIndex + fullComment.length);
+
+  return {
+    range: new vscode.Range(startPos, endPos),
+    yamlContent: extracted.yamlContent,
+    contentStartLine: startPos.line + extracted.yamlStartLineOffset,
+    endpointInfo: extractEndpointInfo(extracted.yamlContent),
+  };
+}
+
+/**
+ * Extracts the YAML after the @swagger/@openapi tag of a JSDoc comment.
+ * Line i of the YAML is line `yamlStartLineOffset + i` of the comment.
+ */
+function extractYamlFromComment(
+  fullComment: string,
+): { yamlContent: string; yamlStartLineOffset: number } | null {
   const lines = fullComment.split(/\r?\n/);
   const yamlLines: string[] = [];
   let swaggerFound = false;
@@ -153,15 +171,29 @@ function processCommentBlock(
     yamlLines.push(cleanLine);
   }
 
-  const yamlContent = yamlLines.join('\n');
-  const endpointInfo = extractEndpointInfo(yamlContent);
+  if (!swaggerFound) {
+    return null;
+  }
 
-  return {
-    range,
-    yamlContent,
-    contentStartLine: startPos.line + yamlStartLineOffset,
-    endpointInfo,
-  };
+  return { yamlContent: yamlLines.join('\n'), yamlStartLineOffset };
+}
+
+/**
+ * Finds the YAML of every Swagger block in raw source text, without needing a
+ * TextDocument (used when scanning files that are not open).
+ */
+export function findSwaggerYamlInText(text: string): string[] {
+  const yamlContents: string[] = [];
+  for (const match of text.matchAll(JS_DOC_REGEX)) {
+    if (!containsSwaggerTag(match[1])) {
+      continue;
+    }
+    const extracted = extractYamlFromComment(match[0]);
+    if (extracted) {
+      yamlContents.push(extracted.yamlContent);
+    }
+  }
+  return yamlContents;
 }
 
 /**
@@ -256,7 +288,10 @@ export interface OpenApiDocument {
  * Merge multiple swagger blocks into a single OpenAPI document.
  * Shared logic used by both exporter and preview.
  */
-export function mergeBlocksToOpenApi(blocks: SwaggerBlock[], title: string): OpenApiDocument {
+export function mergeBlocksToOpenApi(
+  blocks: ReadonlyArray<Pick<SwaggerBlock, 'yamlContent'>>,
+  title: string,
+): OpenApiDocument {
   const paths: Record<string, unknown> = {};
   const components: Record<string, unknown> = {};
   const tagsSet = new Set<string>();

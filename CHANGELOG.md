@@ -12,6 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `swaggerFold.exclude` now uses real glob matching (minimatch): `**` spans multiple folders, dots are literal, bare folder names like `dist` exclude their contents, and Windows paths are matched case-insensitively
 
 ### Fixed
+- **Quick fixes rewritten**: they now use the JSON pointer in each validation error to edit the exact operation with its real indentation
+  - "Add default responses" targets the operation named in the error (one fix per operation) instead of the end of the block
+  - "Fix invalid types" edits the offending `type` line and suggests the closest valid type first
+  - "Add summary" / "Add operationId" are now refactorings for the operation under the cursor (they are optional in OpenAPI, so the validator never reported them), and no longer insert invalid YAML
+- **Add tags**: merges with existing `tags` instead of adding a duplicate key, follows the block's indentation, quotes special values, asks which operation to tag when a block has several, and works from the command palette
+- **Export project**:
+  - The save dialog now defaults to the workspace folder instead of its parent
+  - Build output (`dist`, `out`, `build`, `.next`, …), `.d.ts` and `.min.js` files are skipped, so compiled copies no longer duplicate endpoints
+  - Files are read directly instead of being opened as documents, which no longer triggers validation for every file in the project
 - VSIX package now ships only the esbuild bundle (`out/extension.js`); stray `tsc` output and compiled tests are no longer included
 
 ### Security
