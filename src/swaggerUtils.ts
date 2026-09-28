@@ -277,8 +277,10 @@ async function validateBlock(block: SwaggerBlock): Promise<vscode.Diagnostic | n
   }
 
   try {
+    // Never resolve external $refs: validation runs on every edit and must not
+    // read arbitrary files or make network requests on behalf of workspace content.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await SwaggerParser.validate(docToValidate as any);
+    await SwaggerParser.validate(docToValidate as any, { resolve: { external: false } });
   } catch (err: unknown) {
     return createOpenApiErrorDiagnostic(block, err);
   }
