@@ -66,7 +66,7 @@ export function updateDecorations(editor: vscode.TextEditor): void {
   editor.setDecorations(valueDecorationType, valueRanges);
 }
 
-function clearDecorations(editor: vscode.TextEditor): void {
+export function clearDecorations(editor: vscode.TextEditor): void {
   editor.setDecorations(blockDecorationType, []);
   editor.setDecorations(keyDecorationType, []);
   editor.setDecorations(valueDecorationType, []);

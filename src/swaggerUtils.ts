@@ -33,8 +33,12 @@ const JS_DOC_REGEX = /\/\*\*([\s\S]*?)\*\//g;
 const CLOSING_COMMENT_REGEX = /\*\/$/;
 const LEADING_ASTERISK_REGEX = /^\s*\*\s?/;
 // Regex to match @swagger or @openapi as actual JSDoc tags (not mentioned in text)
-// Matches: start of line, optional whitespace, *, optional whitespace, then the tag
-const SWAGGER_TAG_REGEX = /^\s*\*\s*(@swagger|@openapi)\s*$/m;
+// Matches a line that is only the tag, optionally after `*`. The asterisk is
+// optional so `/** @swagger` (tag on the opening line) is detected too.
+const SWAGGER_TAG_REGEX = /^[ \t]*\*?[ \t]*(@swagger|@openapi)[ \t]*\r?$/m;
+// Comment decoration around a tag: leading `/**` or `*`, trailing `*/`
+const TAG_LINE_PREFIX_REGEX = /^\s*(?:\/\*\*|\*)?/;
+const TAG_LINE_SUFFIX_REGEX = /\*\/\s*$/;
 
 // Cache for parsed blocks
 const blocksCache = new DocumentCache<SwaggerBlock[]>(10);
@@ -51,8 +55,11 @@ function containsSwaggerTag(content: string): boolean {
  * Find which swagger tag is in the line (must be the tag itself, not mentioned in text)
  */
 function findSwaggerTagInLine(line: string): string | null {
-  // Remove leading whitespace and asterisk, then check if line is just the tag
-  const cleanLine = line.replace(LEADING_ASTERISK_REGEX, '').trim();
+  // Remove the comment decoration, then check if line is just the tag
+  const cleanLine = line
+    .replace(TAG_LINE_PREFIX_REGEX, '')
+    .replace(TAG_LINE_SUFFIX_REGEX, '')
+    .trim();
   for (const tag of SWAGGER_TAGS) {
     if (cleanLine === tag) {
       return tag;

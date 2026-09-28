@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { findSwaggerBlocks, validateSwagger, clearBlocksCache, SwaggerBlock } from './swaggerUtils';
-import { activateDecorations, updateDecorations } from './decorator';
+import { activateDecorations, clearDecorations, updateDecorations } from './decorator';
 import { activateCodeLens, SwaggerCodeLensProvider } from './codeLens';
 import { activateHoverProvider } from './hoverProvider';
 import { activateCodeActions } from './codeActions';
@@ -10,6 +10,7 @@ import { showSwaggerPreview, disposePreview } from './preview';
 import {
   DIAGNOSTIC_COLLECTION_NAME,
   COMMANDS,
+  CONFIG,
   isSupportedLanguage,
   configManager,
   isFileExcluded,
@@ -147,7 +148,21 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   });
 
-  context.subscriptions.push(...commands, onOpen, onChange, onClose, onEditorChange);
+  // Event: Settings changed (registered after configManager, so it reads fresh values)
+  const onConfigChange = vscode.workspace.onDidChangeConfiguration((e) => {
+    if (e.affectsConfiguration(CONFIG.SECTION)) {
+      refreshAllDocuments();
+    }
+  });
+
+  context.subscriptions.push(
+    ...commands,
+    onOpen,
+    onChange,
+    onClose,
+    onEditorChange,
+    onConfigChange,
+  );
 
   // Initial processing for active editor
   const activeEditor = vscode.window.activeTextEditor;
@@ -177,6 +192,31 @@ export function deactivate(): void {
 
   // Clear cache
   clearBlocksCache();
+}
+
+/**
+ * Re-applies diagnostics, decorations, CodeLens and status bar after a settings
+ * change (e.g. highlight, exclude or validationSeverity), without waiting for an edit.
+ */
+function refreshAllDocuments(): void {
+  for (const doc of vscode.workspace.textDocuments) {
+    if (shouldProcessDocument(doc)) {
+      triggerValidation(doc);
+    } else {
+      diagnosticCollection.delete(doc.uri);
+    }
+  }
+
+  for (const editor of vscode.window.visibleTextEditors) {
+    if (shouldProcessDocument(editor.document)) {
+      updateDecorations(editor);
+    } else if (isSupportedLanguage(editor.document.languageId)) {
+      clearDecorations(editor);
+    }
+  }
+
+  updateStatusBar();
+  codeLensProvider.refresh();
 }
 
 /**
