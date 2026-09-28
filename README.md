@@ -363,7 +363,7 @@ src/
 
 ## Requirements
 
-*   VS Code 1.80.0 or higher.
+*   VS Code 1.90.0 or higher.
 
 ---
 
