@@ -264,6 +264,7 @@
     "@apidevtools/swagger-parser": "^10.1.0",
     "dotenv": "^17.2.3",
     "js-yaml": "^4.1.0",
+    "minimatch": "^9.0.9",
     "swagger-ui-dist": "^5.30.3"
   }
 }

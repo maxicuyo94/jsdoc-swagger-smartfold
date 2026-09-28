@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { Minimatch } from 'minimatch';
 
 // Extension identifiers
 export const EXTENSION_ID = 'jsdoc-swagger-smartfold';
@@ -63,17 +64,46 @@ export function isFileExcluded(filePath: string, excludePatterns: string[]): boo
 
   const normalizedPath = filePath.replace(/\\/g, '/');
 
-  for (const pattern of excludePatterns) {
-    // Simple glob matching for common patterns
-    const regexPattern = pattern.replace(/\*\*/g, '.*').replace(/\*/g, '[^/]*').replace(/\?/g, '.');
+  return excludePatterns.some((pattern) =>
+    getPatternMatchers(pattern).some((matcher) => matcher.match(normalizedPath)),
+  );
+}
 
-    const regex = new RegExp(regexPattern);
-    if (regex.test(normalizedPath)) {
-      return true;
+const MATCH_OPTIONS = { dot: true, nocase: process.platform === 'win32' };
+const matchersCache = new Map<string, Minimatch[]>();
+
+/**
+ * Compiles an exclude pattern into matchers for absolute file paths.
+ * Relative patterns match at any depth ('dist' → '**\/dist'), and every pattern
+ * also matches the contents of a folder with that name ('**\/dist/**').
+ */
+function getPatternMatchers(pattern: string): Minimatch[] {
+  const cached = matchersCache.get(pattern);
+  if (cached) {
+    return cached;
+  }
+
+  let glob = pattern.trim().replace(/\\/g, '/');
+  if (glob.startsWith('./')) {
+    glob = glob.slice(2);
+  }
+
+  const matchers: Minimatch[] = [];
+  if (glob.length > 0) {
+    const isAbsolute = glob.startsWith('/') || /^[a-zA-Z]:\//.test(glob);
+    if (!isAbsolute && !glob.startsWith('**/')) {
+      glob = `**/${glob}`;
+    }
+    glob = glob.replace(/\/+$/, '');
+
+    matchers.push(new Minimatch(glob, MATCH_OPTIONS));
+    if (!glob.endsWith('/**')) {
+      matchers.push(new Minimatch(`${glob}/**`, MATCH_OPTIONS));
     }
   }
 
-  return false;
+  matchersCache.set(pattern, matchers);
+  return matchers;
 }
 
 /**

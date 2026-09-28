@@ -70,3 +70,15 @@ test('Swagger validation reports errors for invalid OpenAPI structure', async ()
     // The block is missing required 'responses' field, so it should have at least one diagnostic
     assert.ok(diagnostics.length >= 1, 'Expected at least one diagnostic for missing responses');
 });
+
+test('Swagger validation does not resolve external $refs', async () => {
+  const jsdoc = `/**\n * @swagger\n * /api/ext:\n *   get:\n *     responses:\n *       200:\n *         description: ok\n *         content:\n *           application/json:\n *             schema:\n *               $ref: 'http://127.0.0.1:9/schema.json'\n */`;
+  const document = createDocument(jsdoc, 'file:///external-ref.ts');
+  const diagnostics = await validateSwagger(findSwaggerBlocks(document));
+  for (const diagnostic of diagnostics) {
+    assert.ok(
+      !/download|fetch/i.test(diagnostic.message),
+      `External $ref must not be fetched: ${diagnostic.message}`,
+    );
+  }
+});
