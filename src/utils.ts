@@ -31,6 +31,29 @@ export function debounce<T extends (...args: Parameters<T>) => void>(
 }
 
 /**
+ * Tracks the latest run started for each key, so results of async work that
+ * was superseded (or whose key was forgotten) can be discarded.
+ */
+export class LatestRunTracker<K> {
+  private readonly runs = new Map<K, number>();
+  private counter = 0;
+
+  start(key: K): number {
+    const run = ++this.counter;
+    this.runs.set(key, run);
+    return run;
+  }
+
+  isLatest(key: K, run: number): boolean {
+    return this.runs.get(key) === run;
+  }
+
+  forget(key: K): void {
+    this.runs.delete(key);
+  }
+}
+
+/**
  * Simple LRU-like cache for document blocks
  */
 export class DocumentCache<T> {

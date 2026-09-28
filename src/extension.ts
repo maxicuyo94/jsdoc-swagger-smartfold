@@ -14,14 +14,22 @@ import {
   configManager,
   isFileExcluded,
 } from './constants';
-import { debounce } from './utils';
+import { debounce, LatestRunTracker } from './utils';
 
-// Debounce delay in milliseconds (fallbacks if config not available)
-const DEFAULT_VALIDATION_DEBOUNCE_MS = 300;
+// Debounce delay in milliseconds
+const VALIDATION_DEBOUNCE_MS = 300;
 const DECORATION_DEBOUNCE_MS = 150;
 
 let diagnosticCollection: vscode.DiagnosticCollection;
 let codeLensProvider: SwaggerCodeLensProvider;
+
+// Latest validation per document URI, to drop results that finish out of order
+const validationRuns = new LatestRunTracker<string>();
+
+// Documents already auto-folded in this session: switching back to a tab must
+// not re-fold blocks the user unfolded. Cleared when the document is closed.
+const autoFoldedDocuments = new Set<string>();
+const pendingAutoFolds = new Set<ReturnType<typeof setTimeout>>();
 
 // Debounced functions (initialized in activate)
 let debouncedValidation: ReturnType<typeof debounce<(doc: vscode.TextDocument) => void>>;
@@ -52,11 +60,10 @@ export function activate(context: vscode.ExtensionContext): void {
   // Initialize Status Bar
   activateStatusBar(context);
 
-  // Create debounced functions (use autoFoldDelay config for validation debounce)
-  const validationDelay = configManager.autoFoldDelay || DEFAULT_VALIDATION_DEBOUNCE_MS;
+  // Create debounced functions
   debouncedValidation = debounce((doc: vscode.TextDocument) => {
     triggerValidation(doc);
-  }, validationDelay);
+  }, VALIDATION_DEBOUNCE_MS);
 
   debouncedDecoration = debounce((editor: vscode.TextEditor) => {
     updateDecorations(editor);
@@ -136,7 +143,10 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Event: Document closed (cleanup cache)
   const onClose = vscode.workspace.onDidCloseTextDocument((doc) => {
-    clearBlocksCache(doc.uri.toString());
+    const uri = doc.uri.toString();
+    clearBlocksCache(uri);
+    validationRuns.forget(uri);
+    autoFoldedDocuments.delete(uri);
     diagnosticCollection.delete(doc.uri);
   });
 
@@ -155,15 +165,14 @@ export function activate(context: vscode.ExtensionContext): void {
     triggerValidation(activeEditor.document);
     updateDecorations(activeEditor);
     updateStatusBar();
-
-    if (configManager.autoFold) {
-      foldSwaggerBlocks(activeEditor).catch(console.error);
-    }
+    autoFoldOnFirstShow(activeEditor);
   }
 }
 
 export function deactivate(): void {
-  // Cancel pending debounced calls
+  // Cancel pending debounced calls and auto-folds
+  pendingAutoFolds.forEach(clearTimeout);
+  pendingAutoFolds.clear();
   debouncedValidation?.cancel();
   debouncedDecoration?.cancel();
   debouncedStatusBar?.cancel();
@@ -419,7 +428,7 @@ async function handleAddTags(uri: vscode.Uri, range: vscode.Range): Promise<void
   }
 }
 
-async function handleActiveEditorChange(editor: vscode.TextEditor): Promise<void> {
+function handleActiveEditorChange(editor: vscode.TextEditor): void {
   const doc = editor.document;
 
   if (!shouldProcessDocument(doc)) {
@@ -430,11 +439,31 @@ async function handleActiveEditorChange(editor: vscode.TextEditor): Promise<void
   triggerValidation(doc);
   updateDecorations(editor);
   updateStatusBar();
+  autoFoldOnFirstShow(editor);
+}
 
-  // Auto-fold if enabled
-  if (configManager.autoFold) {
-    await foldSwaggerBlocks(editor);
+/**
+ * Folds the editor's Swagger blocks after `autoFoldDelay`, only the first time
+ * its document is shown in this session.
+ */
+function autoFoldOnFirstShow(editor: vscode.TextEditor): void {
+  const uri = editor.document.uri.toString();
+  if (!configManager.autoFold || autoFoldedDocuments.has(uri)) {
+    return;
   }
+  autoFoldedDocuments.add(uri);
+
+  const timer = setTimeout(() => {
+    pendingAutoFolds.delete(timer);
+    // Folding acts on the active editor: if the user already switched away,
+    // leave the document unmarked so it folds when shown again
+    if (vscode.window.activeTextEditor?.document !== editor.document) {
+      autoFoldedDocuments.delete(uri);
+      return;
+    }
+    foldSwaggerBlocks(editor).catch(console.error);
+  }, configManager.autoFoldDelay);
+  pendingAutoFolds.add(timer);
 }
 
 /**
@@ -445,9 +474,19 @@ async function triggerValidation(document: vscode.TextDocument): Promise<void> {
     return;
   }
 
+  const uri = document.uri.toString();
+  const run = validationRuns.start(uri);
+  const version = document.version;
+
   try {
     const blocks = findSwaggerBlocks(document);
     const diagnostics = await validateSwagger(blocks);
+
+    // Drop stale results: a newer validation started, or the document was
+    // edited (a debounced validation is pending) or closed meanwhile
+    if (!validationRuns.isLatest(uri, run) || document.isClosed || document.version !== version) {
+      return;
+    }
     diagnosticCollection.set(document.uri, diagnostics);
   } catch (error) {
     console.error('[JSDoc Swagger SmartFold] Validation error:', error);

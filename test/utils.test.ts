@@ -1,6 +1,6 @@
 import * as assert from 'node:assert';
 import test, { describe } from 'node:test';
-import { debounce, DocumentCache } from '../src/utils';
+import { debounce, DocumentCache, LatestRunTracker } from '../src/utils';
 import { isFileExcluded } from '../src/constants';
 import { extractEndpointInfo, findSwaggerBlocks } from '../src/swaggerUtils';
 import * as vscode from 'vscode';
@@ -154,6 +154,52 @@ describe('debounce', () => {
     fn(); // restart again
     await new Promise((r) => setTimeout(r, 60));
     assert.strictEqual(count, 1, 'should only fire once');
+  });
+});
+
+// ── LatestRunTracker ────────────────────────────────────────────────
+
+describe('LatestRunTracker', () => {
+  test('only the most recent run for a key is latest', () => {
+    const tracker = new LatestRunTracker<string>();
+    const first = tracker.start('file:///a.ts');
+    const second = tracker.start('file:///a.ts');
+
+    assert.strictEqual(tracker.isLatest('file:///a.ts', first), false);
+    assert.strictEqual(tracker.isLatest('file:///a.ts', second), true);
+  });
+
+  test('runs for different keys are independent', () => {
+    const tracker = new LatestRunTracker<string>();
+    const a = tracker.start('file:///a.ts');
+    const b = tracker.start('file:///b.ts');
+
+    assert.strictEqual(tracker.isLatest('file:///a.ts', a), true);
+    assert.strictEqual(tracker.isLatest('file:///b.ts', b), true);
+  });
+
+  test('forgetting a key invalidates its in-flight run', () => {
+    const tracker = new LatestRunTracker<string>();
+    const run = tracker.start('file:///a.ts');
+    tracker.forget('file:///a.ts');
+
+    assert.strictEqual(tracker.isLatest('file:///a.ts', run), false);
+  });
+
+  test('a slower earlier run finishing last is discarded', async () => {
+    const tracker = new LatestRunTracker<string>();
+    const published: string[] = [];
+
+    const validate = async (result: string, delayMs: number): Promise<void> => {
+      const run = tracker.start('file:///a.ts');
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      if (tracker.isLatest('file:///a.ts', run)) {
+        published.push(result);
+      }
+    };
+
+    await Promise.all([validate('stale', 30), validate('fresh', 5)]);
+    assert.deepStrictEqual(published, ['fresh']);
   });
 });
 
