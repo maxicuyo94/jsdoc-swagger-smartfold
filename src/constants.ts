@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { Minimatch } from 'minimatch';
 
 // Extension identifiers
 export const EXTENSION_ID = 'jsdoc-swagger-smartfold';
@@ -64,34 +65,6 @@ export function isSupportedLanguage(languageId: string): boolean {
 }
 
 /**
- * Escape regex special characters except glob wildcards (* and ?)
- */
-function escapeRegexChars(str: string): string {
-  return str.replace(/[.+^${}()|[\]\\]/g, '\\$&');
-}
-
-/**
- * Convert a glob pattern to a RegExp.
- * Supports **, *, and ? wildcards.
- */
-function globToRegex(pattern: string): RegExp {
-  // Split on ** first, then handle * and ? in each segment
-  const parts = pattern.split('**');
-  const regexParts = parts.map((part) => {
-    // Split on * to handle single-star segments
-    return part
-      .split('*')
-      .map((segment) => {
-        // Escape regex chars, then replace ? with single-char wildcard
-        return escapeRegexChars(segment).replace(/\?/g, '.');
-      })
-      .join('[^/]*');
-  });
-
-  return new RegExp(regexParts.join('.*'));
-}
-
-/**
  * Check if a file should be excluded based on glob patterns
  */
 export function isFileExcluded(filePath: string, excludePatterns: string[]): boolean {
@@ -101,14 +74,46 @@ export function isFileExcluded(filePath: string, excludePatterns: string[]): boo
 
   const normalizedPath = filePath.replace(/\\/g, '/');
 
-  for (const pattern of excludePatterns) {
-    const regex = globToRegex(pattern);
-    if (regex.test(normalizedPath)) {
-      return true;
+  return excludePatterns.some((pattern) =>
+    getPatternMatchers(pattern).some((matcher) => matcher.match(normalizedPath)),
+  );
+}
+
+const MATCH_OPTIONS = { dot: true, nocase: process.platform === 'win32' };
+const matchersCache = new Map<string, Minimatch[]>();
+
+/**
+ * Compiles an exclude pattern into matchers for absolute file paths.
+ * Relative patterns match at any depth ('dist' → '**\/dist'), and every pattern
+ * also matches the contents of a folder with that name ('**\/dist/**').
+ */
+function getPatternMatchers(pattern: string): Minimatch[] {
+  const cached = matchersCache.get(pattern);
+  if (cached) {
+    return cached;
+  }
+
+  let glob = pattern.trim().replace(/\\/g, '/');
+  if (glob.startsWith('./')) {
+    glob = glob.slice(2);
+  }
+
+  const matchers: Minimatch[] = [];
+  if (glob.length > 0) {
+    const isAbsolute = glob.startsWith('/') || /^[a-zA-Z]:\//.test(glob);
+    if (!isAbsolute && !glob.startsWith('**/')) {
+      glob = `**/${glob}`;
+    }
+    glob = glob.replace(/\/+$/, '');
+
+    matchers.push(new Minimatch(glob, MATCH_OPTIONS));
+    if (!glob.endsWith('/**')) {
+      matchers.push(new Minimatch(`${glob}/**`, MATCH_OPTIONS));
     }
   }
 
-  return false;
+  matchersCache.set(pattern, matchers);
+  return matchers;
 }
 
 /**

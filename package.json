@@ -29,7 +29,7 @@
     "theme": "dark"
   },
   "engines": {
-    "vscode": "^1.80.0"
+    "vscode": "^1.90.0"
   },
   "categories": [
     "Other",
@@ -232,7 +232,7 @@
     "watch": "npm run esbuild-watch",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
-    "test": "node --require ./out/test/setup.js --test \"out/test/**/*.test.js\"",
+    "test": "node scripts/run-tests.js",
     "package": "npm run copy-swagger-ui && vsce package",
     "publish:vs": "vsce publish",
     "publish:ovsx": "ovsx publish",
@@ -244,8 +244,8 @@
     "@types/express": "^5.0.5",
     "@types/jest": "^30.0.0",
     "@types/js-yaml": "^4.0.9",
-    "@types/node": "18.x",
-    "@types/vscode": "^1.80.0",
+    "@types/node": "^20.19.43",
+    "@types/vscode": "~1.90.0",
     "@typescript-eslint/eslint-plugin": "^8.48.0",
     "@typescript-eslint/parser": "^8.48.0",
     "@vscode/vsce": "^3.2.1",
@@ -264,6 +264,7 @@
   "dependencies": {
     "@apidevtools/swagger-parser": "^10.1.0",
     "js-yaml": "^4.1.0",
+    "minimatch": "^10.2.6",
     "swagger-ui-dist": "^5.30.3"
   }
 }

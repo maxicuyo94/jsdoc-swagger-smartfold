@@ -37,9 +37,9 @@ export class SwaggerHoverProvider implements vscode.HoverProvider {
   }
 
   private createHoverContent(block: SwaggerBlock): vscode.MarkdownString {
+    // Content comes from workspace files: keep it untrusted so embedded
+    // `command:` links or HTML cannot execute anything.
     const md = new vscode.MarkdownString();
-    md.isTrusted = true;
-    md.supportHtml = true;
 
     if (block.endpointInfo) {
       const { method, path, summary, description, tags, parameters, responses } =
