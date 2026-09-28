@@ -141,7 +141,7 @@ function getSwaggerUIHtml(webview: vscode.Webview, extensionUri: vscode.Uri, spe
     default-src 'none';
     style-src ${webview.cspSource} 'unsafe-inline';
     script-src 'nonce-${nonce}';
-    img-src ${webview.cspSource} data: https:;
+    img-src ${webview.cspSource} data:;
     font-src ${webview.cspSource};
   ">
   <title>Swagger Preview</title>

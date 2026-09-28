@@ -17,7 +17,7 @@ Automatically detects JSDoc comments containing the `@swagger` or `@openapi` tag
 ### ✅ Validation
 Validates the content of your Swagger/OpenAPI definitions:
 *   **YAML Syntax Check**: Ensures valid YAML structure.
-*   **OpenAPI Schema Validation**: Checks against OpenAPI 3.0/3.1 specification (best effort for fragments).
+*   **OpenAPI Schema Validation**: Checks against the OpenAPI specification. Fragments (e.g. a single path) are validated as OpenAPI 3.0; complete documents are validated with the version they declare (3.0 or 3.1).
 *   **Error Reporting**: Displays errors and warnings directly in VS Code's "Problems" panel.
 *   **Configurable Severity**: Set validation errors as `error`, `warning`, or `info`.
 
@@ -59,7 +59,7 @@ Automatic code actions for common issues:
 *   **Format Options**: Export as YAML or JSON
 
 ### 👁️ Swagger UI Preview
-*   Live preview of your API documentation using Swagger UI
+*   Preview of the current file's API documentation using Swagger UI (run the command again to refresh after editing)
 *   Dark theme adapted to VS Code
 *   Opens in a side panel
 
