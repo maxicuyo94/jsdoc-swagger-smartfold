@@ -5,6 +5,16 @@ All notable changes to the **JSDoc Swagger SmartFold** extension will be documen
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **Minimum VS Code version is now 1.90** (Node.js 20 runtime)
+- `swaggerFold.exclude` now uses real glob matching (minimatch): `**` spans multiple folders, dots are literal, bare folder names like `dist` exclude their contents, and Windows paths are matched case-insensitively
+
+### Security
+- OpenAPI validation no longer resolves external `$ref`s (no file reads or network requests triggered by workspace content)
+- Hover previews no longer render workspace content as trusted Markdown
+
 ## [0.0.6] - 2024-12-01
 
 ### Added
