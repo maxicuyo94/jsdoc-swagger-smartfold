@@ -20,6 +20,11 @@ import { debounce, LatestRunTracker } from './utils';
 const VALIDATION_DEBOUNCE_MS = 300;
 const DECORATION_DEBOUNCE_MS = 150;
 
+// While folding ranges are not available yet (e.g. the TypeScript server is
+// still starting), retry the auto-fold for up to AUTO_FOLD_RETRIES * interval
+const AUTO_FOLD_RETRY_INTERVAL_MS = 500;
+const AUTO_FOLD_RETRIES = 20;
+
 let diagnosticCollection: vscode.DiagnosticCollection;
 let codeLensProvider: SwaggerCodeLensProvider;
 
@@ -490,9 +495,46 @@ function autoFoldOnFirstShow(editor: vscode.TextEditor): void {
       autoFoldedDocuments.delete(uri);
       return;
     }
-    foldSwaggerBlocks(editor).catch(console.error);
+    foldWhenRangesReady(editor).catch(console.error);
   }, configManager.autoFoldDelay);
   pendingAutoFolds.add(timer);
+}
+
+/**
+ * Folds the editor's Swagger blocks once folding providers report a range for
+ * each of them. Folding before that (right after startup) silently does nothing.
+ */
+async function foldWhenRangesReady(editor: vscode.TextEditor): Promise<void> {
+  const document = editor.document;
+
+  for (let attempt = 0; attempt < AUTO_FOLD_RETRIES; attempt++) {
+    if (vscode.window.activeTextEditor?.document !== document || document.isClosed) {
+      // Not folded: fold when the document is shown again
+      autoFoldedDocuments.delete(document.uri.toString());
+      return;
+    }
+
+    const blockStarts = findSwaggerBlocks(document).map((block) => block.range.start.line);
+    if (blockStarts.length === 0) {
+      return;
+    }
+
+    const ranges =
+      (await vscode.commands.executeCommand<vscode.FoldingRange[]>(
+        'vscode.executeFoldingRangeProvider',
+        document.uri,
+      )) ?? [];
+    const rangeStarts = new Set(ranges.map((range) => range.start));
+    if (blockStarts.every((line) => rangeStarts.has(line))) {
+      break;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, AUTO_FOLD_RETRY_INTERVAL_MS));
+  }
+
+  if (vscode.window.activeTextEditor?.document === document) {
+    await foldSwaggerBlocks(vscode.window.activeTextEditor);
+  }
 }
 
 /**
