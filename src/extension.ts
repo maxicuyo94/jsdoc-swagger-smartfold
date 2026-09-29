@@ -27,7 +27,8 @@ let codeLensProvider: SwaggerCodeLensProvider;
 const validationRuns = new LatestRunTracker<string>();
 
 // Documents already auto-folded in this session: switching back to a tab must
-// not re-fold blocks the user unfolded. Cleared when the document is closed.
+// not re-fold blocks the user unfolded. Cleared when the file's last tab closes
+// (documents outlive their tabs, so onDidCloseTextDocument fires too late).
 const autoFoldedDocuments = new Set<string>();
 const pendingAutoFolds = new Set<ReturnType<typeof setTimeout>>();
 
@@ -157,7 +158,19 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   });
 
-  context.subscriptions.push(...commands, onOpen, onChange, onClose, onEditorChange);
+  // Event: Tabs closed (re-arm auto-fold for files no longer open in any tab)
+  const onTabsChange = vscode.window.tabGroups.onDidChangeTabs((e) => {
+    if (e.closed.length > 0) {
+      const openUris = getOpenTabUris();
+      for (const uri of autoFoldedDocuments) {
+        if (!openUris.has(uri)) {
+          autoFoldedDocuments.delete(uri);
+        }
+      }
+    }
+  });
+
+  context.subscriptions.push(...commands, onOpen, onChange, onClose, onEditorChange, onTabsChange);
 
   // Initial processing for active editor
   const activeEditor = vscode.window.activeTextEditor;
@@ -443,8 +456,24 @@ function handleActiveEditorChange(editor: vscode.TextEditor): void {
 }
 
 /**
- * Folds the editor's Swagger blocks after `autoFoldDelay`, only the first time
- * its document is shown in this session.
+ * URIs of the text documents open in any editor tab (including both sides of diffs)
+ */
+function getOpenTabUris(): Set<string> {
+  const uris = new Set<string>();
+  for (const tab of vscode.window.tabGroups.all.flatMap((group) => group.tabs)) {
+    if (tab.input instanceof vscode.TabInputText) {
+      uris.add(tab.input.uri.toString());
+    } else if (tab.input instanceof vscode.TabInputTextDiff) {
+      uris.add(tab.input.original.toString());
+      uris.add(tab.input.modified.toString());
+    }
+  }
+  return uris;
+}
+
+/**
+ * Folds the editor's Swagger blocks after `autoFoldDelay`, the first time its
+ * document is shown since it was opened in a tab.
  */
 function autoFoldOnFirstShow(editor: vscode.TextEditor): void {
   const uri = editor.document.uri.toString();
