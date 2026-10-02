@@ -84,3 +84,18 @@ test('Swagger validation does not resolve external $refs', async () => {
     );
   }
 });
+
+test('Swagger Block Detection - detects the tag on the opening comment line', () => {
+  const jsdoc = `/** @swagger\n * /api/inline:\n *   get:\n *     summary: Inline\n */`;
+  const blocks = findSwaggerBlocks(createDocument(jsdoc, 'file:///inline-tag.ts'));
+  assert.strictEqual(blocks.length, 1, 'Block with inline tag should be detected');
+  assert.strictEqual(blocks[0].contentStartLine, 1);
+  assert.ok(blocks[0].yamlContent.includes('/api/inline:'));
+  assert.strictEqual(blocks[0].endpointInfo?.path, '/api/inline');
+});
+
+test('Swagger Block Detection - ignores tags mentioned inside text', () => {
+  const jsdoc = `/** Documented with @swagger elsewhere\n * see @openapi docs\n */`;
+  const blocks = findSwaggerBlocks(createDocument(jsdoc, 'file:///mention.ts'));
+  assert.strictEqual(blocks.length, 0);
+});

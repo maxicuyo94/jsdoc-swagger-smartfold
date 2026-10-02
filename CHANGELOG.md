@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `swaggerFold.exclude` now uses real glob matching (minimatch): `**` spans multiple folders, dots are literal, bare folder names like `dist` exclude their contents, and Windows paths are matched case-insensitively
 
 ### Fixed
+- **`/** @swagger` on the opening line is now detected** (the tag can share the line with the comment opener; tags mentioned inside text are still ignored)
+- **Settings apply immediately**: changing any `swaggerFold` setting (e.g. `highlight`, `exclude`, `validationSeverity`) refreshes diagnostics, decorations, CodeLens and the status bar without waiting for an edit
 - README: the Swagger UI preview is documented as a snapshot (it refreshes when the command is run again), and validation as OpenAPI 3.0 for fragments / declared version for complete documents
 - Removed the unused `@types/jest` dev dependency and fixed the `scripts/release.js` shebang
 - **Auto-fold no longer re-folds on every tab switch**: blocks are folded only the first time a file is shown in the session (again after it is closed and reopened), so blocks you unfold stay unfolded
