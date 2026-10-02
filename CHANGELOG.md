@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `swaggerFold.exclude` now uses real glob matching (minimatch): `**` spans multiple folders, dots are literal, bare folder names like `dist` exclude their contents, and Windows paths are matched case-insensitively
 
 ### Fixed
+- README: the Swagger UI preview is documented as a snapshot (it refreshes when the command is run again), and validation as OpenAPI 3.0 for fragments / declared version for complete documents
+- Removed the unused `@types/jest` dev dependency and fixed the `scripts/release.js` shebang
 - **Auto-fold no longer re-folds on every tab switch**: blocks are folded only the first time a file is shown in the session (again after it is closed and reopened), so blocks you unfold stay unfolded
 - **`autoFoldDelay` restored to its documented meaning** (delay before auto-folding); 0.0.7 had wired it to the validation debounce instead
 - **Stale diagnostics**: validation results that finish after a newer validation started, after the document was edited, or after it was closed are now discarded instead of overwriting fresher diagnostics
@@ -28,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - VSIX package now ships only the esbuild bundle (`out/extension.js`); stray `tsc` output and compiled tests are no longer included
 
 ### Security
+- Swagger UI preview no longer loads remote images (`img-src https:` removed from the webview CSP)
 - OpenAPI validation no longer resolves external `$ref`s (no file reads or network requests triggered by workspace content)
 - Hover previews no longer render workspace content as trusted Markdown
 
