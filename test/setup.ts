@@ -8,10 +8,24 @@ class Position {
 }
 
 class Range {
+  public start: Position;
+  public end: Position;
+
+  // Mirrors both vscode.Range overloads: (start, end) and (startLine, startChar, endLine, endChar)
   constructor(
-    public start: Position,
-    public end: Position,
-  ) {}
+    start: Position | number,
+    end: Position | number,
+    endLine?: number,
+    endChar?: number,
+  ) {
+    if (typeof start === 'number' && typeof end === 'number') {
+      this.start = new Position(start, end);
+      this.end = new Position(endLine ?? start, endChar ?? end);
+    } else {
+      this.start = start as Position;
+      this.end = end as Position;
+    }
+  }
 
   contains(position: Position): boolean {
     const isAfterStart =
@@ -110,6 +124,12 @@ class WorkspaceEdit {
   insert(uri: unknown, position: Position, newText: string): void {
     const existing = this.edits.get(uri) ?? [];
     existing.push({ range: new Range(position, position), newText });
+    this.edits.set(uri, existing);
+  }
+
+  replace(uri: unknown, range: Range, newText: string): void {
+    const existing = this.edits.get(uri) ?? [];
+    existing.push({ range, newText });
     this.edits.set(uri, existing);
   }
 

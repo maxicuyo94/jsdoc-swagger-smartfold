@@ -15,6 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Auto-fold no longer re-folds on every tab switch**: blocks are folded only the first time a file is shown in the session (again after it is closed and reopened), so blocks you unfold stay unfolded
 - **`autoFoldDelay` restored to its documented meaning** (delay before auto-folding); 0.0.7 had wired it to the validation debounce instead
 - **Stale diagnostics**: validation results that finish after a newer validation started, after the document was edited, or after it was closed are now discarded instead of overwriting fresher diagnostics
+- **Quick fixes rewritten**: they now use the JSON pointer in each validation error to edit the exact operation with its real indentation
+  - "Add default responses" targets the operation named in the error (one fix per operation) instead of the end of the block
+  - "Fix invalid types" edits the offending `type` line and suggests the closest valid type first
+  - "Add summary" / "Add operationId" are now refactorings for the operation under the cursor (they are optional in OpenAPI, so the validator never reported them), and no longer insert invalid YAML
+- **Add tags**: merges with existing `tags` instead of adding a duplicate key, follows the block's indentation, quotes special values, asks which operation to tag when a block has several, and works from the command palette
+- **Export project**:
+  - The save dialog now defaults to the workspace folder instead of its parent
+  - Build output (`dist`, `out`, `build`, `.next`, …), `.d.ts` and `.min.js` files are skipped, so compiled copies no longer duplicate endpoints
+  - Files are read directly instead of being opened as documents, which no longer triggers validation for every file in the project
+- **No more false `$ref` errors between blocks**: each block is validated with the `components` defined anywhere in the same file, and references to components defined in other files are no longer reported as unresolved
 - VSIX package now ships only the esbuild bundle (`out/extension.js`); stray `tsc` output and compiled tests are no longer included
 
 ### Security
