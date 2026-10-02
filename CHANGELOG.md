@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `swaggerFold.exclude` now uses real glob matching (minimatch): `**` spans multiple folders, dots are literal, bare folder names like `dist` exclude their contents, and Windows paths are matched case-insensitively
 
 ### Fixed
+- **`/** @swagger` on the opening line is now detected** (the tag can share the line with the comment opener; tags mentioned inside text are still ignored)
+- **Settings apply immediately**: changing any `swaggerFold` setting (e.g. `highlight`, `exclude`, `validationSeverity`) refreshes diagnostics, decorations, CodeLens and the status bar without waiting for an edit
 - VSIX package now ships only the esbuild bundle (`out/extension.js`); stray `tsc` output and compiled tests are no longer included
 
 ### Security
