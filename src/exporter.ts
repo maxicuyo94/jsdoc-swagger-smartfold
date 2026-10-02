@@ -3,12 +3,22 @@ import * as yaml from 'js-yaml';
 import * as path from 'path';
 import {
   findSwaggerBlocks,
+  findSwaggerYamlInText,
   parseYamlContent,
   SwaggerBlock,
   mergeBlocksToOpenApi,
   OpenApiDocument,
 } from './swaggerUtils';
 import { isSupportedLanguage, configManager, isFileExcluded } from './constants';
+
+// Source files scanned by the project export
+const PROJECT_FILES_GLOB = '**/*.{js,ts,jsx,tsx,mjs,cjs,vue,svelte}';
+
+// Dependencies, build output and type declarations: JSDoc comments survive
+// compilation, so scanning these would duplicate every endpoint
+const PROJECT_EXCLUDE_GLOB =
+  '{**/node_modules/**,**/dist/**,**/out/**,**/build/**,**/coverage/**,' +
+  '**/.next/**,**/.nuxt/**,**/.svelte-kit/**,**/*.d.ts,**/*.min.js}';
 
 /**
  * Export all swagger blocks from current file to a single OpenAPI document
@@ -39,7 +49,7 @@ export async function exportCurrentFile(): Promise<void> {
   }
 
   const openApiDoc = mergeBlocksToOpenApi(blocks, path.basename(document.fileName));
-  await saveOpenApiDocument(openApiDoc, document.fileName);
+  await saveOpenApiDocument(openApiDoc, path.dirname(document.fileName));
 }
 
 /**
@@ -54,11 +64,7 @@ export async function exportProject(): Promise<void> {
 
   const excludePatterns = configManager.exclude;
 
-  // Find all supported files
-  const pattern = '**/*.{js,ts,jsx,tsx,vue,svelte}';
-  const excludePattern = '**/node_modules/**';
-
-  const files = await vscode.workspace.findFiles(pattern, excludePattern);
+  const files = await vscode.workspace.findFiles(PROJECT_FILES_GLOB, PROJECT_EXCLUDE_GLOB);
 
   const candidateFiles =
     excludePatterns.length === 0
@@ -70,7 +76,7 @@ export async function exportProject(): Promise<void> {
     return;
   }
 
-  const allBlocks: SwaggerBlock[] = [];
+  const allBlocks: Array<Pick<SwaggerBlock, 'yamlContent'>> = [];
 
   await vscode.window.withProgress(
     {
@@ -90,13 +96,10 @@ export async function exportProject(): Promise<void> {
         });
 
         try {
-          const document = await vscode.workspace.openTextDocument(candidateFiles[i]);
-          if (isSupportedLanguage(document.languageId)) {
-            const blocks = findSwaggerBlocks(document);
-            allBlocks.push(...blocks);
-          }
+          const text = await readFileText(candidateFiles[i]);
+          allBlocks.push(...findSwaggerYamlInText(text).map((yamlContent) => ({ yamlContent })));
         } catch {
-          // Skip files that can't be opened
+          // Skip files that can't be read
         }
       }
     },
@@ -113,14 +116,29 @@ export async function exportProject(): Promise<void> {
 }
 
 /**
+ * Reads a file's text, preferring the open (possibly unsaved) editor contents.
+ * Avoids openTextDocument, which would fire open events (and validation) for
+ * every file in the project.
+ */
+async function readFileText(uri: vscode.Uri): Promise<string> {
+  const openDocument = vscode.workspace.textDocuments.find(
+    (doc) => doc.uri.toString() === uri.toString(),
+  );
+  if (openDocument) {
+    return openDocument.getText();
+  }
+  return new TextDecoder('utf-8').decode(await vscode.workspace.fs.readFile(uri));
+}
+
+/**
  * Save OpenAPI document to file
  */
-async function saveOpenApiDocument(doc: OpenApiDocument, basePath: string): Promise<void> {
+async function saveOpenApiDocument(doc: OpenApiDocument, defaultDir: string): Promise<void> {
   const format = configManager.exportFormat;
   const ext = format === 'json' ? 'json' : 'yaml';
 
   // Ask user for save location
-  const defaultUri = vscode.Uri.file(path.join(path.dirname(basePath), `openapi.${ext}`));
+  const defaultUri = vscode.Uri.file(path.join(defaultDir, `openapi.${ext}`));
 
   const saveUri = await vscode.window.showSaveDialog({
     defaultUri,

@@ -3,7 +3,8 @@ import { findSwaggerBlocks, validateSwagger, clearBlocksCache, SwaggerBlock } fr
 import { activateDecorations, updateDecorations } from './decorator';
 import { activateCodeLens, SwaggerCodeLensProvider } from './codeLens';
 import { activateHoverProvider } from './hoverProvider';
-import { activateCodeActions } from './codeActions';
+import { activateCodeActions, findOperationAt } from './codeActions';
+import { buildAddTagsChange, listOperations, OperationRef } from './swaggerEdits';
 import { activateStatusBar, updateStatusBar, disposeStatusBar } from './statusBar';
 import { exportCurrentFile, exportProject, copyBlockAsJson } from './exporter';
 import { showSwaggerPreview, disposePreview } from './preview';
@@ -14,14 +15,28 @@ import {
   configManager,
   isFileExcluded,
 } from './constants';
-import { debounce } from './utils';
+import { debounce, LatestRunTracker } from './utils';
 
-// Debounce delay in milliseconds (fallbacks if config not available)
-const DEFAULT_VALIDATION_DEBOUNCE_MS = 300;
+// Debounce delay in milliseconds
+const VALIDATION_DEBOUNCE_MS = 300;
 const DECORATION_DEBOUNCE_MS = 150;
+
+// While folding ranges are not available yet (e.g. the TypeScript server is
+// still starting), retry the auto-fold for up to AUTO_FOLD_RETRIES * interval
+const AUTO_FOLD_RETRY_INTERVAL_MS = 500;
+const AUTO_FOLD_RETRIES = 20;
 
 let diagnosticCollection: vscode.DiagnosticCollection;
 let codeLensProvider: SwaggerCodeLensProvider;
+
+// Latest validation per document URI, to drop results that finish out of order
+const validationRuns = new LatestRunTracker<string>();
+
+// Documents already auto-folded in this session: switching back to a tab must
+// not re-fold blocks the user unfolded. Cleared when the file's last tab closes
+// (documents outlive their tabs, so onDidCloseTextDocument fires too late).
+const autoFoldedDocuments = new Set<string>();
+const pendingAutoFolds = new Set<ReturnType<typeof setTimeout>>();
 
 // Debounced functions (initialized in activate)
 let debouncedValidation: ReturnType<typeof debounce<(doc: vscode.TextDocument) => void>>;
@@ -52,11 +67,10 @@ export function activate(context: vscode.ExtensionContext): void {
   // Initialize Status Bar
   activateStatusBar(context);
 
-  // Create debounced functions (use autoFoldDelay config for validation debounce)
-  const validationDelay = configManager.autoFoldDelay || DEFAULT_VALIDATION_DEBOUNCE_MS;
+  // Create debounced functions
   debouncedValidation = debounce((doc: vscode.TextDocument) => {
     triggerValidation(doc);
-  }, validationDelay);
+  }, VALIDATION_DEBOUNCE_MS);
 
   debouncedDecoration = debounce((editor: vscode.TextEditor) => {
     updateDecorations(editor);
@@ -98,8 +112,8 @@ export function activate(context: vscode.ExtensionContext): void {
     // Add tags command
     vscode.commands.registerCommand(
       COMMANDS.ADD_TAGS,
-      async (uri: vscode.Uri, range: vscode.Range) => {
-        await handleAddTags(uri, range);
+      async (uri?: vscode.Uri, position?: vscode.Position) => {
+        await handleAddTags(uri, position);
       },
     ),
   ];
@@ -136,7 +150,10 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Event: Document closed (cleanup cache)
   const onClose = vscode.workspace.onDidCloseTextDocument((doc) => {
-    clearBlocksCache(doc.uri.toString());
+    const uri = doc.uri.toString();
+    clearBlocksCache(uri);
+    validationRuns.forget(uri);
+    autoFoldedDocuments.delete(uri);
     diagnosticCollection.delete(doc.uri);
   });
 
@@ -147,7 +164,19 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   });
 
-  context.subscriptions.push(...commands, onOpen, onChange, onClose, onEditorChange);
+  // Event: Tabs closed (re-arm auto-fold for files no longer open in any tab)
+  const onTabsChange = vscode.window.tabGroups.onDidChangeTabs((e) => {
+    if (e.closed.length > 0) {
+      const openUris = getOpenTabUris();
+      for (const uri of autoFoldedDocuments) {
+        if (!openUris.has(uri)) {
+          autoFoldedDocuments.delete(uri);
+        }
+      }
+    }
+  });
+
+  context.subscriptions.push(...commands, onOpen, onChange, onClose, onEditorChange, onTabsChange);
 
   // Initial processing for active editor
   const activeEditor = vscode.window.activeTextEditor;
@@ -155,15 +184,14 @@ export function activate(context: vscode.ExtensionContext): void {
     triggerValidation(activeEditor.document);
     updateDecorations(activeEditor);
     updateStatusBar();
-
-    if (configManager.autoFold) {
-      foldSwaggerBlocks(activeEditor).catch(console.error);
-    }
+    autoFoldOnFirstShow(activeEditor);
   }
 }
 
 export function deactivate(): void {
-  // Cancel pending debounced calls
+  // Cancel pending debounced calls and auto-folds
+  pendingAutoFolds.forEach(clearTimeout);
+  pendingAutoFolds.clear();
   debouncedValidation?.cancel();
   debouncedDecoration?.cancel();
   debouncedStatusBar?.cancel();
@@ -340,86 +368,87 @@ function handlePreviousBlock(): void {
 }
 
 /**
- * Handles adding tags to a swagger block
+ * Adds tags to the operation at `position` (or the cursor when invoked from
+ * the command palette), asking which operation to use when it is ambiguous.
  */
-async function handleAddTags(uri: vscode.Uri, range: vscode.Range): Promise<void> {
-  const document = await vscode.workspace.openTextDocument(uri);
-  // Show the document to ensure it's visible (result not needed)
-  await vscode.window.showTextDocument(document);
-
-  // Get the swagger block content
-  const blockText = document.getText(range);
-
-  // Find the HTTP method line to insert tags after
-  const lines = blockText.split(/\r?\n/);
-  let insertLineOffset = -1;
-  let indentation = '';
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    // Look for HTTP method (get, post, put, etc.)
-    const methodMatch = line.match(/^\s*\*\s+(get|post|put|patch|delete|options|head):/i);
-    if (methodMatch) {
-      insertLineOffset = i + 1;
-      // Calculate indentation (should be same level as summary, description, etc.)
-      const asteriskPos = line.indexOf('*');
-      indentation = ' '.repeat(asteriskPos + 1) + '  ';
-      break;
-    }
-  }
-
-  if (insertLineOffset === -1) {
-    vscode.window.showWarningMessage('Could not find HTTP method in swagger block');
+async function handleAddTags(uri?: vscode.Uri, position?: vscode.Position): Promise<void> {
+  const editor = uri
+    ? await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(uri))
+    : vscode.window.activeTextEditor;
+  if (!editor) {
     return;
   }
 
-  // Ask user for tags
-  const tagsInput = await vscode.window.showInputBox({
-    prompt: 'Enter tags separated by commas',
-    placeHolder: 'Users, Authentication, API',
-    validateInput: (value) => {
-      if (!value || value.trim().length === 0) {
-        return 'Please enter at least one tag';
-      }
-      return null;
-    },
-  });
+  const document = editor.document;
+  const target = position ?? editor.selection.active;
+  const block = findSwaggerBlocks(document).find((b) => b.range.contains(target));
+  if (!block) {
+    vscode.window.showInformationMessage('Cursor is not inside a Swagger block');
+    return;
+  }
 
+  const operation = await pickOperation(listOperations(block), target.line);
+  if (!operation) {
+    return;
+  }
+
+  const tagsInput = await vscode.window.showInputBox({
+    prompt: `Tags for ${operation.method.toUpperCase()} ${operation.path} (comma separated)`,
+    placeHolder: 'Users, Authentication, API',
+    validateInput: (value) => (value.trim().length === 0 ? 'Please enter at least one tag' : null),
+  });
   if (!tagsInput) {
     return; // User cancelled
   }
 
-  // Parse and format tags
   const tags = tagsInput
     .split(',')
     .map((tag) => tag.trim())
     .filter((tag) => tag.length > 0);
 
-  if (tags.length === 0) {
+  // The document may have changed while the input box was open
+  const currentBlock = findSwaggerBlocks(document).find((b) =>
+    b.range.contains(new vscode.Position(operation.line, 0)),
+  );
+  const change =
+    currentBlock &&
+    buildAddTagsChange(document, currentBlock, operation.path, operation.method, tags);
+  if (!change) {
+    vscode.window.showInformationMessage('All those tags are already present');
     return;
   }
 
-  // Build the tags YAML
-  const tagsYaml =
-    `${indentation}tags:\n` + tags.map((tag) => `${indentation}  - ${tag}`).join('\n');
-
-  // Calculate the line to insert at
-  const insertLine = range.start.line + insertLineOffset;
-  const insertPosition = new vscode.Position(insertLine, 0);
-
-  // Apply the edit
   const edit = new vscode.WorkspaceEdit();
-  edit.insert(uri, insertPosition, tagsYaml + '\n');
-
-  const success = await vscode.workspace.applyEdit(edit);
-  if (success) {
+  edit.replace(document.uri, change.range, change.newText);
+  if (await vscode.workspace.applyEdit(edit)) {
     vscode.window.showInformationMessage(`Added tags: ${tags.join(', ')}`);
   } else {
     vscode.window.showErrorMessage('Failed to add tags');
   }
 }
 
-async function handleActiveEditorChange(editor: vscode.TextEditor): Promise<void> {
+async function pickOperation(
+  operations: OperationRef[],
+  line: number,
+): Promise<OperationRef | undefined> {
+  if (operations.length === 0) {
+    vscode.window.showWarningMessage('No operations found in this Swagger block');
+    return undefined;
+  }
+
+  const atCursor = findOperationAt(operations, line);
+  if (atCursor || operations.length === 1) {
+    return atCursor ?? operations[0];
+  }
+
+  const picked = await vscode.window.showQuickPick(
+    operations.map((op) => ({ label: `${op.method.toUpperCase()} ${op.path}`, op })),
+    { placeHolder: 'Select the operation to tag' },
+  );
+  return picked?.op;
+}
+
+function handleActiveEditorChange(editor: vscode.TextEditor): void {
   const doc = editor.document;
 
   if (!shouldProcessDocument(doc)) {
@@ -430,10 +459,83 @@ async function handleActiveEditorChange(editor: vscode.TextEditor): Promise<void
   triggerValidation(doc);
   updateDecorations(editor);
   updateStatusBar();
+  autoFoldOnFirstShow(editor);
+}
 
-  // Auto-fold if enabled
-  if (configManager.autoFold) {
-    await foldSwaggerBlocks(editor);
+/**
+ * URIs of the text documents open in any editor tab (including both sides of diffs)
+ */
+function getOpenTabUris(): Set<string> {
+  const uris = new Set<string>();
+  for (const tab of vscode.window.tabGroups.all.flatMap((group) => group.tabs)) {
+    if (tab.input instanceof vscode.TabInputText) {
+      uris.add(tab.input.uri.toString());
+    } else if (tab.input instanceof vscode.TabInputTextDiff) {
+      uris.add(tab.input.original.toString());
+      uris.add(tab.input.modified.toString());
+    }
+  }
+  return uris;
+}
+
+/**
+ * Folds the editor's Swagger blocks after `autoFoldDelay`, the first time its
+ * document is shown since it was opened in a tab.
+ */
+function autoFoldOnFirstShow(editor: vscode.TextEditor): void {
+  const uri = editor.document.uri.toString();
+  if (!configManager.autoFold || autoFoldedDocuments.has(uri)) {
+    return;
+  }
+  autoFoldedDocuments.add(uri);
+
+  const timer = setTimeout(() => {
+    pendingAutoFolds.delete(timer);
+    // Folding acts on the active editor: if the user already switched away,
+    // leave the document unmarked so it folds when shown again
+    if (vscode.window.activeTextEditor?.document !== editor.document) {
+      autoFoldedDocuments.delete(uri);
+      return;
+    }
+    foldWhenRangesReady(editor).catch(console.error);
+  }, configManager.autoFoldDelay);
+  pendingAutoFolds.add(timer);
+}
+
+/**
+ * Folds the editor's Swagger blocks once folding providers report a range for
+ * each of them. Folding before that (right after startup) silently does nothing.
+ */
+async function foldWhenRangesReady(editor: vscode.TextEditor): Promise<void> {
+  const document = editor.document;
+
+  for (let attempt = 0; attempt < AUTO_FOLD_RETRIES; attempt++) {
+    if (vscode.window.activeTextEditor?.document !== document || document.isClosed) {
+      // Not folded: fold when the document is shown again
+      autoFoldedDocuments.delete(document.uri.toString());
+      return;
+    }
+
+    const blockStarts = findSwaggerBlocks(document).map((block) => block.range.start.line);
+    if (blockStarts.length === 0) {
+      return;
+    }
+
+    const ranges =
+      (await vscode.commands.executeCommand<vscode.FoldingRange[]>(
+        'vscode.executeFoldingRangeProvider',
+        document.uri,
+      )) ?? [];
+    const rangeStarts = new Set(ranges.map((range) => range.start));
+    if (blockStarts.every((line) => rangeStarts.has(line))) {
+      break;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, AUTO_FOLD_RETRY_INTERVAL_MS));
+  }
+
+  if (vscode.window.activeTextEditor?.document === document) {
+    await foldSwaggerBlocks(vscode.window.activeTextEditor);
   }
 }
 
@@ -445,9 +547,19 @@ async function triggerValidation(document: vscode.TextDocument): Promise<void> {
     return;
   }
 
+  const uri = document.uri.toString();
+  const run = validationRuns.start(uri);
+  const version = document.version;
+
   try {
     const blocks = findSwaggerBlocks(document);
     const diagnostics = await validateSwagger(blocks);
+
+    // Drop stale results: a newer validation started, or the document was
+    // edited (a debounced validation is pending) or closed meanwhile
+    if (!validationRuns.isLatest(uri, run) || document.isClosed || document.version !== version) {
+      return;
+    }
     diagnosticCollection.set(document.uri, diagnostics);
   } catch (error) {
     console.error('[JSDoc Swagger SmartFold] Validation error:', error);
