@@ -7,13 +7,18 @@
  * patterns from Node 21 onwards, and CI runs Node 20 (the VS Code runtime).
  */
 
-const { readdirSync } = require('node:fs');
+const { existsSync, readdirSync } = require('node:fs');
 const { join } = require('node:path');
 const { spawnSync } = require('node:child_process');
 
+const sourceDir = join(__dirname, '..', 'test');
 const testDir = join(__dirname, '..', 'out', 'test');
+
+// tsc never deletes old output, so skip compiled tests whose source is gone
+// (e.g. left over from another branch)
 const testFiles = readdirSync(testDir)
   .filter((file) => file.endsWith('.test.js'))
+  .filter((file) => existsSync(join(sourceDir, file.replace(/\.js$/, '.ts'))))
   .sort()
   .map((file) => join(testDir, file));
 

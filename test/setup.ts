@@ -127,6 +127,12 @@ class WorkspaceEdit {
     this.edits.set(uri, existing);
   }
 
+  replace(uri: unknown, range: Range, newText: string): void {
+    const existing = this.edits.get(uri) ?? [];
+    existing.push({ range, newText });
+    this.edits.set(uri, existing);
+  }
+
   entries(): [unknown, TextEdit[]][] {
     return Array.from(this.edits.entries());
   }
