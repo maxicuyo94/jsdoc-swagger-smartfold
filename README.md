@@ -17,7 +17,7 @@ Automatically detects JSDoc comments containing the `@swagger` or `@openapi` tag
 ### ✅ Validation
 Validates the content of your Swagger/OpenAPI definitions:
 *   **YAML Syntax Check**: Ensures valid YAML structure.
-*   **OpenAPI Schema Validation**: Checks against OpenAPI 3.0/3.1 specification (best effort for fragments).
+*   **OpenAPI Schema Validation**: Checks against the OpenAPI specification. Fragments (e.g. a single path) are validated as OpenAPI 3.0; complete documents are validated with the version they declare (3.0 or 3.1).
 *   **Error Reporting**: Displays errors and warnings directly in VS Code's "Problems" panel.
 *   **Configurable Severity**: Set validation errors as `error`, `warning`, or `info`.
 
@@ -37,11 +37,13 @@ Hover over `@swagger` or `@openapi` tags to see a formatted preview:
 *   YAML preview (truncated for large blocks)
 
 ### 🔧 Quick Fixes
-Automatic code actions for common issues:
-*   Add default responses
-*   Add summary field
-*   Add operationId
-*   Fix invalid types
+Code actions based on the validation errors, placed at the exact operation and matching your indentation:
+*   **Add default responses** to each operation missing `responses`
+*   **Fix invalid types**, suggesting the closest valid type first (e.g. `strng` → `string`)
+
+Refactorings for the operation under the cursor:
+*   **Add tags** (merged with existing tags; asks which operation when the block has several)
+*   **Add summary** / **Add operationId** (with a generated id such as `getUsersById`) when missing
 
 ### 📊 Status Bar
 *   Shows count of Swagger blocks in current file
@@ -54,12 +56,12 @@ Automatic code actions for common issues:
 
 ### 📤 Export
 *   **Export Current File**: Combine all Swagger blocks from current file into a single OpenAPI document
-*   **Export Project**: Scan entire project and export all Swagger blocks
+*   **Export Project**: Scan entire project and export all Swagger blocks (skips `node_modules`, build output such as `dist/`, `out/` and `build/`, and `.d.ts` files)
 *   **Copy as JSON**: Copy current block as JSON to clipboard
 *   **Format Options**: Export as YAML or JSON
 
 ### 👁️ Swagger UI Preview
-*   Live preview of your API documentation using Swagger UI
+*   Preview of the current file's API documentation using Swagger UI (run the command again to refresh after editing)
 *   Dark theme adapted to VS Code
 *   Opens in a side panel
 
