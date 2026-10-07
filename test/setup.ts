@@ -138,6 +138,26 @@ class WorkspaceEdit {
   }
 }
 
+class EventEmitter<T> {
+  private listeners: Array<(value: T) => void> = [];
+
+  readonly event = (listener: (value: T) => void): { dispose: () => void } => {
+    this.listeners.push(listener);
+    return { dispose: () => undefined };
+  };
+
+  fire(value: T): void {
+    this.listeners.forEach((listener) => listener(value));
+  }
+}
+
+class CodeLens {
+  constructor(
+    public range: Range,
+    public command?: unknown,
+  ) {}
+}
+
 class CodeActionKind {
   constructor(public value: string) {}
 
@@ -185,6 +205,8 @@ const vscodeMock = {
   WorkspaceEdit,
   CodeAction,
   CodeActionKind,
+  CodeLens,
+  EventEmitter,
   Uri: {
     parse: (value: string) => ({ toString: () => value, fsPath: value }),
   },

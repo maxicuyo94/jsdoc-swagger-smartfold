@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { findSwaggerBlocks, SwaggerBlock } from './swaggerUtils';
-import { isSupportedLanguage, configManager } from './constants';
+import { isDocumentEnabled, configManager } from './constants';
 
 // Decoration types (initialized once)
 let blockDecorationType: vscode.TextEditorDecorationType;
@@ -41,13 +41,8 @@ export function updateDecorations(editor: vscode.TextEditor): void {
 
   const document = editor.document;
 
-  // Skip unsupported languages
-  if (!isSupportedLanguage(document.languageId)) {
-    return;
-  }
-
-  // Check if highlighting is enabled
-  if (!configManager.highlight) {
+  // Unsupported or excluded documents, or highlighting turned off
+  if (!isDocumentEnabled(document) || !configManager.highlight) {
     clearDecorations(editor);
     return;
   }
@@ -66,7 +61,7 @@ export function updateDecorations(editor: vscode.TextEditor): void {
   editor.setDecorations(valueDecorationType, valueRanges);
 }
 
-export function clearDecorations(editor: vscode.TextEditor): void {
+function clearDecorations(editor: vscode.TextEditor): void {
   editor.setDecorations(blockDecorationType, []);
   editor.setDecorations(keyDecorationType, []);
   editor.setDecorations(valueDecorationType, []);

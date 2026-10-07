@@ -167,3 +167,16 @@ class ConfigManager {
 }
 
 export const configManager = new ConfigManager();
+
+/**
+ * Whether the extension works on this document: a supported language and not
+ * excluded by `swaggerFold.exclude`. Every feature (diagnostics, decorations,
+ * CodeLens, hover, code actions, status bar) uses this same check.
+ */
+export function isDocumentEnabled(document: vscode.TextDocument): boolean {
+  if (!isSupportedLanguage(document.languageId)) {
+    return false;
+  }
+  const excludePatterns = configManager.exclude;
+  return excludePatterns.length === 0 || !isFileExcluded(document.uri.fsPath, excludePatterns);
+}

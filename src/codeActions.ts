@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { COMMANDS } from './constants';
 import { findSwaggerBlocks, SwaggerBlock } from './swaggerUtils';
-import { isSupportedLanguage, DIAGNOSTICS_SOURCE, DOCUMENT_SELECTORS } from './constants';
+import { isDocumentEnabled, DIAGNOSTICS_SOURCE, DOCUMENT_SELECTORS } from './constants';
 import {
   buildAddOperationFieldChange,
   buildAddResponsesChange,
@@ -37,7 +37,7 @@ export class SwaggerCodeActionProvider implements vscode.CodeActionProvider {
     context: vscode.CodeActionContext,
     _token: vscode.CancellationToken,
   ): vscode.CodeAction[] {
-    if (!isSupportedLanguage(document.languageId)) {
+    if (!isDocumentEnabled(document)) {
       return [];
     }
 

@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { findSwaggerBlocks, SwaggerBlock } from './swaggerUtils';
-import { isSupportedLanguage, SWAGGER_TAGS, DOCUMENT_SELECTORS } from './constants';
+import { isDocumentEnabled, SWAGGER_TAGS, DOCUMENT_SELECTORS } from './constants';
 
 /**
  * Hover provider for Swagger blocks
@@ -12,7 +12,7 @@ export class SwaggerHoverProvider implements vscode.HoverProvider {
     position: vscode.Position,
     _token: vscode.CancellationToken,
   ): vscode.Hover | null {
-    if (!isSupportedLanguage(document.languageId)) {
+    if (!isDocumentEnabled(document)) {
       return null;
     }
 

@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { findSwaggerBlocks, SwaggerBlock } from './swaggerUtils';
-import { isSupportedLanguage, COMMANDS, DOCUMENT_SELECTORS } from './constants';
+import { isDocumentEnabled, COMMANDS, DOCUMENT_SELECTORS } from './constants';
 
 /**
  * CodeLens provider for Swagger blocks
@@ -18,7 +18,7 @@ export class SwaggerCodeLensProvider implements vscode.CodeLensProvider {
     document: vscode.TextDocument,
     _token: vscode.CancellationToken,
   ): vscode.CodeLens[] {
-    if (!isSupportedLanguage(document.languageId)) {
+    if (!isDocumentEnabled(document)) {
       return [];
     }
 
