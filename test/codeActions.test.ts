@@ -1,7 +1,7 @@
 import * as assert from 'node:assert';
 import * as vscode from 'vscode';
 import test from 'node:test';
-import { SwaggerCodeActionProvider } from '../src/codeActions';
+import { SwaggerCodeActionProvider, suggestTypes } from '../src/codeActions';
 import { findSwaggerBlocks, parseYamlContent } from '../src/swaggerUtils';
 
 const { testUtils } = vscode as unknown as {
@@ -177,4 +177,25 @@ test('Code actions - does not offer fields that are already present', () => {
   const titles = getActions(document, '', 4).map((a) => a.title);
   assert.ok(!titles.some((t) => t.startsWith('Add summary')), titles.join(', '));
   assert.ok(titles.includes('Add operationId to GET /users'), titles.join(', '));
+});
+
+test('suggestTypes - offers only the closest type when it is a clear match', () => {
+  assert.deepStrictEqual(suggestTypes('strng'), ['string']);
+  assert.deepStrictEqual(suggestTypes('obj'), ['object']);
+  assert.deepStrictEqual(suggestTypes('bool'), ['boolean']);
+  assert.deepStrictEqual(suggestTypes('int'), ['integer']);
+  assert.deepStrictEqual(suggestTypes('String'), ['string']);
+});
+
+test('suggestTypes - offers every type, closest first, when nothing is a clear match', () => {
+  const suggestions = suggestTypes('foo');
+  assert.strictEqual(suggestions.length, 6);
+  assert.deepStrictEqual([...suggestions].sort(), [
+    'array',
+    'boolean',
+    'integer',
+    'number',
+    'object',
+    'string',
+  ]);
 });

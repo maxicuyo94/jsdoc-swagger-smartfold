@@ -107,11 +107,7 @@ export class SwaggerCodeActionProvider implements vscode.CodeActionProvider {
     }
 
     const current = document.getText(valueRange).replace(/['"]/g, '');
-    const suggestions = [...OPENAPI_TYPES].sort(
-      (a, b) => editDistance(current, a) - editDistance(current, b),
-    );
-
-    return suggestions.map((type, index) => {
+    return suggestTypes(current).map((type, index) => {
       const fix = this.createAction(
         document,
         `Change type "${current}" to "${type}"`,
@@ -210,6 +206,29 @@ export function findOperationAt(
   line: number,
 ): OperationRef | undefined {
   return operations.find((op) => line >= op.line && line <= op.endLine);
+}
+
+/**
+ * Valid OpenAPI types to suggest for an invalid `type` value: only the closest
+ * one when it is a clear match (e.g. `strng`, `obj`, `bool`), otherwise all of
+ * them, closest first.
+ */
+export function suggestTypes(invalidType: string): string[] {
+  // Abbreviations: a prefix of exactly one type (int, obj, bool, num, str)
+  const lower = invalidType.toLowerCase();
+  const prefixMatches = OPENAPI_TYPES.filter((type) => lower.length >= 2 && type.startsWith(lower));
+  if (prefixMatches.length === 1) {
+    return prefixMatches;
+  }
+
+  const ranked = OPENAPI_TYPES.map((type) => ({
+    type,
+    distance: editDistance(invalidType, type),
+  })).sort((a, b) => a.distance - b.distance);
+  const [best, second] = ranked;
+  const isClearMatch =
+    best.distance <= Math.ceil(best.type.length / 2) && best.distance < second.distance;
+  return isClearMatch ? [best.type] : ranked.map((r) => r.type);
 }
 
 function editDistance(a: string, b: string): number {
