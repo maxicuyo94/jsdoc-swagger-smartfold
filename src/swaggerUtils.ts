@@ -3,6 +3,7 @@ import * as yaml from 'js-yaml';
 import SwaggerParser from '@apidevtools/swagger-parser';
 import { DIAGNOSTICS_SOURCE, SWAGGER_TAGS, HTTP_METHODS, configManager } from './constants';
 import { DocumentCache } from './utils';
+import { locateYamlPath, parseJsonPointer } from './yamlLocator';
 
 export interface SwaggerBlock {
   range: vscode.Range;
@@ -405,36 +406,38 @@ export async function validateSwagger(blocks: SwaggerBlock[]): Promise<vscode.Di
   // Validate all blocks in parallel for better performance
   const results = await Promise.all(blocks.map((block) => validateBlock(block, sharedComponents)));
 
-  // Filter out null results
-  return results.filter((d): d is vscode.Diagnostic => d !== null);
+  return results.flat();
 }
 
 async function validateBlock(
   block: SwaggerBlock,
   sharedComponents: Record<string, unknown>,
-): Promise<vscode.Diagnostic | null> {
+): Promise<vscode.Diagnostic[]> {
   // 1. Validate YAML Syntax
   let parsedYaml: unknown;
   try {
     parsedYaml = yaml.load(block.yamlContent);
   } catch (e: unknown) {
-    return createYamlErrorDiagnostic(block, e as YamlError);
+    const diagnostic = createYamlErrorDiagnostic(block, e as YamlError);
+    return diagnostic ? [diagnostic] : [];
   }
 
   // Skip empty content
   if (!parsedYaml) {
-    return null;
+    return [];
   }
 
   // 2. Validate OpenAPI Structure
   const docToValidate = prepareOpenApiDoc(parsedYaml);
 
   if (!docToValidate) {
-    return new vscode.Diagnostic(
-      new vscode.Range(block.contentStartLine, 0, block.contentStartLine, 100),
-      'Swagger content must be an object (e.g. paths).',
-      vscode.DiagnosticSeverity.Error,
-    );
+    return [
+      new vscode.Diagnostic(
+        new vscode.Range(block.contentStartLine, 0, block.contentStartLine, 100),
+        'Swagger content must be an object (e.g. paths).',
+        vscode.DiagnosticSeverity.Error,
+      ),
+    ];
   }
 
   try {
@@ -445,10 +448,10 @@ async function validateBlock(
       resolve: { external: false },
     });
   } catch (err: unknown) {
-    return createOpenApiErrorDiagnostic(block, err);
+    return createOpenApiErrorDiagnostics(block, err, parsedYaml);
   }
 
-  return null;
+  return [];
 }
 
 function createYamlErrorDiagnostic(
@@ -472,11 +475,83 @@ function createYamlErrorDiagnostic(
   return diagnostic;
 }
 
-function createOpenApiErrorDiagnostic(block: SwaggerBlock, err: unknown): vscode.Diagnostic {
-  const message = err instanceof Error ? err.message : 'Invalid OpenAPI definition';
-  const range = new vscode.Range(block.contentStartLine, 0, block.range.end.line, 0);
+// One validator error per line, e.g. "  #/paths/~1users/get must have required property 'responses'"
+const POINTER_ERROR_REGEX = /^\s*(#\/\S*)\s+(.+?)\s*$/;
 
-  // Get configured severity
+// Generic errors the schema validator adds on top of a more specific error at
+// the same or a deeper path (e.g. after a bad `type`, its parent "must match
+// exactly one schema in oneOf" because it is neither a valid schema nor a $ref)
+const CASCADE_ERROR_REGEX =
+  /^must (have required property '\$ref'|match exactly one schema in oneOf|match a schema in anyOf)$/;
+
+/**
+ * One diagnostic per validator error, on the line of the offending YAML node.
+ * Falls back to a single diagnostic for the whole block when the message has
+ * no JSON pointers (e.g. reference or semantic errors).
+ */
+function createOpenApiErrorDiagnostics(
+  block: SwaggerBlock,
+  err: unknown,
+  parsedYaml: unknown,
+): vscode.Diagnostic[] {
+  const message = err instanceof Error ? err.message : 'Invalid OpenAPI definition';
+  const blockRange = new vscode.Range(block.contentStartLine, 0, block.range.end.line, 0);
+
+  const errors = message
+    .split(/\r?\n/)
+    .map((line) => POINTER_ERROR_REGEX.exec(line))
+    .filter((match): match is RegExpExecArray => match !== null)
+    .map(([, pointer, text]) => ({ pointer, text }));
+
+  if (errors.length === 0) {
+    return [createOpenApiDiagnostic(blockRange, `OpenAPI Validation Error: ${message}`)];
+  }
+
+  const specific = errors.filter((e) => !CASCADE_ERROR_REGEX.test(e.text));
+  const isRestated = (e: { pointer: string; text: string }): boolean =>
+    CASCADE_ERROR_REGEX.test(e.text) &&
+    specific.some((s) => s.pointer === e.pointer || s.pointer.startsWith(`${e.pointer}/`));
+
+  // Keyed by "pointer text" to drop exact duplicates
+  const unique = new Map(
+    errors.filter((e) => !isRestated(e)).map((e) => [`${e.pointer} ${e.text}`, e]),
+  );
+  return [...unique.values()].map((e) =>
+    createOpenApiDiagnostic(
+      locateErrorRange(block, e.pointer, parsedYaml) ?? blockRange,
+      `OpenAPI Validation Error: ${e.pointer} ${e.text}`,
+    ),
+  );
+}
+
+/**
+ * Range of the line holding the node at `pointer` (or its closest existing
+ * ancestor). Fragments are validated wrapped in `paths`, so that segment is
+ * dropped unless the block itself declares `paths`.
+ */
+function locateErrorRange(
+  block: SwaggerBlock,
+  pointer: string,
+  parsedYaml: unknown,
+): vscode.Range | undefined {
+  let segments = parseJsonPointer(pointer);
+  const hasPathsRoot =
+    typeof parsedYaml === 'object' && parsedYaml !== null && 'paths' in parsedYaml;
+  if (segments[0] === 'paths' && !hasPathsRoot) {
+    segments = segments.slice(1);
+  }
+
+  for (let length = segments.length; length > 0; length--) {
+    const node = locateYamlPath(block.yamlContent, segments.slice(0, length));
+    if (node) {
+      const line = block.contentStartLine + node.line;
+      return new vscode.Range(line, 0, line, Number.MAX_SAFE_INTEGER);
+    }
+  }
+  return undefined;
+}
+
+function createOpenApiDiagnostic(range: vscode.Range, message: string): vscode.Diagnostic {
   const severityMap: Record<string, vscode.DiagnosticSeverity> = {
     error: vscode.DiagnosticSeverity.Error,
     warning: vscode.DiagnosticSeverity.Warning,
@@ -485,7 +560,7 @@ function createOpenApiErrorDiagnostic(block: SwaggerBlock, err: unknown): vscode
   const severity =
     severityMap[configManager.validationSeverity] ?? vscode.DiagnosticSeverity.Warning;
 
-  const diagnostic = new vscode.Diagnostic(range, `OpenAPI Validation Error: ${message}`, severity);
+  const diagnostic = new vscode.Diagnostic(range, message, severity);
   diagnostic.source = DIAGNOSTICS_SOURCE;
   return diagnostic;
 }
