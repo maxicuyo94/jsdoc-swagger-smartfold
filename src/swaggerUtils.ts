@@ -554,9 +554,9 @@ const COMPONENT_REF_PREFIX = '#/components/';
  * defined in the current file. With swagger-jsdoc, components usually live in
  * other files, so a file-level validator cannot tell them apart from typos.
  */
-const COMPONENT_STUBS: Record<string, (name: string) => unknown> = {
-  schemas: () => ({}),
-  responses: () => ({ description: '' }),
+const COMPONENT_STUBS: Record<string, (name: string, note?: string) => unknown> = {
+  schemas: (_name, note) => (note ? { description: note } : {}),
+  responses: (_name, note) => ({ description: note ?? '' }),
   parameters: (name) => ({ name, in: 'query', schema: {} }),
   requestBodies: () => ({ content: {} }),
   headers: () => ({ schema: {} }),
@@ -595,7 +595,36 @@ function withSharedComponents(
     };
   }
 
-  for (const ref of collectComponentRefs(doc)) {
+  addReferencedComponents(doc, components);
+
+  const result = { ...doc };
+  if (Object.keys(components).length > 0) {
+    result.components = components;
+  }
+  return structuredClone(result);
+}
+
+/**
+ * Adds to `components` every component referenced (directly or through other
+ * components) by `root` that is missing: copied from `available` when it has
+ * it, otherwise replaced by a minimal stub (described by `stubNote`, if given).
+ */
+export function addReferencedComponents(
+  root: unknown,
+  components: Record<string, Record<string, unknown>>,
+  available: Record<string, unknown> = {},
+  stubNote?: string,
+): void {
+  const pending = [...collectComponentRefs(root)];
+  const seen = new Set<string>();
+
+  while (pending.length > 0) {
+    const ref = pending.pop() as string;
+    if (seen.has(ref)) {
+      continue;
+    }
+    seen.add(ref);
+
     const [section, name] = ref
       .slice(COMPONENT_REF_PREFIX.length)
       .split('/')
@@ -604,17 +633,39 @@ function withSharedComponents(
     if (!name || !createStub) {
       continue;
     }
+
     components[section] ??= {};
-    if (!(name in components[section])) {
-      components[section][name] = createStub(name);
+    if (name in components[section]) {
+      continue;
+    }
+
+    const definition = asRecord(available[section])[name];
+    if (definition !== undefined) {
+      components[section][name] = definition;
+      pending.push(...collectComponentRefs(definition));
+    } else {
+      components[section][name] = createStub(name, stubNote);
     }
   }
+}
 
-  const result = { ...doc };
-  if (Object.keys(components).length > 0) {
-    result.components = components;
+/**
+ * Whether `root` references a component that `components` does not define.
+ */
+export function hasMissingComponentRefs(
+  root: unknown,
+  components: Record<string, unknown> = {},
+): boolean {
+  for (const ref of collectComponentRefs(root)) {
+    const [section, name] = ref
+      .slice(COMPONENT_REF_PREFIX.length)
+      .split('/')
+      .map((segment) => segment.replace(/~1/g, '/').replace(/~0/g, '~'));
+    if (name && !(name in asRecord(components[section]))) {
+      return true;
+    }
   }
-  return structuredClone(result);
+  return false;
 }
 
 function collectComponentRefs(value: unknown, refs = new Set<string>()): Set<string> {
