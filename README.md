@@ -18,7 +18,7 @@ Automatically detects JSDoc comments containing the `@swagger` or `@openapi` tag
 Validates the content of your Swagger/OpenAPI definitions:
 *   **YAML Syntax Check**: Ensures valid YAML structure.
 *   **OpenAPI Schema Validation**: Checks against the OpenAPI specification. Fragments (e.g. a single path) are validated as OpenAPI 3.0; complete documents are validated with the version they declare (3.0 or 3.1).
-*   **Error Reporting**: Displays errors and warnings directly in VS Code's "Problems" panel.
+*   **Error Reporting**: Displays errors and warnings directly in VS Code's "Problems" panel, each one on the exact line it refers to.
 *   **Configurable Severity**: Set validation errors as `error`, `warning`, or `info`.
 
 ### 🏷️ CodeLens
@@ -39,7 +39,7 @@ Hover over `@swagger` or `@openapi` tags to see a formatted preview:
 ### 🔧 Quick Fixes
 Code actions based on the validation errors, placed at the exact operation and matching your indentation:
 *   **Add default responses** to each operation missing `responses`
-*   **Fix invalid types**, suggesting the closest valid type first (e.g. `strng` → `string`)
+*   **Fix invalid types**: a clear typo or abbreviation gets just the intended type (e.g. `strng` → `string`, `int` → `integer`); otherwise every valid type is offered, closest first
 
 Refactorings for the operation under the cursor:
 *   **Add tags** (merged with existing tags; asks which operation when the block has several)
@@ -62,6 +62,7 @@ Refactorings for the operation under the cursor:
 
 ### 👁️ Swagger UI Preview
 *   Preview of the current file's API documentation using Swagger UI (run the command again to refresh after editing)
+*   `$ref`s to components defined in other files of the workspace are resolved automatically
 *   Dark theme adapted to VS Code
 *   Opens in a side panel
 
