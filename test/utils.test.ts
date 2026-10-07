@@ -142,17 +142,21 @@ describe('debounce', () => {
     assert.strictEqual(called, false, 'should not be called after cancel');
   });
 
-  test('resets timer on repeated calls', async () => {
+  test('resets timer on repeated calls', (t) => {
+    // Mocked timers: real ones made this flaky on slow or loaded machines
+    t.mock.timers.enable({ apis: ['setTimeout'] });
     let count = 0;
     const fn = debounce(() => {
       count++;
     }, 30);
     fn();
-    await new Promise((r) => setTimeout(r, 10));
+    t.mock.timers.tick(10);
     fn(); // restart
-    await new Promise((r) => setTimeout(r, 10));
+    t.mock.timers.tick(10);
     fn(); // restart again
-    await new Promise((r) => setTimeout(r, 60));
+    t.mock.timers.tick(29);
+    assert.strictEqual(count, 0, 'should not fire before the delay after the last call');
+    t.mock.timers.tick(1);
     assert.strictEqual(count, 1, 'should only fire once');
   });
 });
