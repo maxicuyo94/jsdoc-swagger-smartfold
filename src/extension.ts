@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { findSwaggerBlocks, validateSwagger, clearBlocksCache, SwaggerBlock } from './swaggerUtils';
-import { activateDecorations, clearDecorations, updateDecorations } from './decorator';
+import { activateDecorations, updateDecorations } from './decorator';
 import { activateCodeLens, SwaggerCodeLensProvider } from './codeLens';
 import { activateHoverProvider } from './hoverProvider';
 import { activateCodeActions, findOperationAt } from './codeActions';
@@ -12,9 +12,8 @@ import {
   DIAGNOSTIC_COLLECTION_NAME,
   COMMANDS,
   CONFIG,
-  isSupportedLanguage,
+  isDocumentEnabled,
   configManager,
-  isFileExcluded,
 } from './constants';
 import { debounce, LatestRunTracker } from './utils';
 
@@ -121,7 +120,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Event: Document opened
   const onOpen = vscode.workspace.onDidOpenTextDocument((doc) => {
-    if (shouldProcessDocument(doc)) {
+    if (isDocumentEnabled(doc)) {
       triggerValidation(doc);
     }
   });
@@ -129,7 +128,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // Event: Document changed
   const onChange = vscode.workspace.onDidChangeTextDocument((e) => {
     const doc = e.document;
-    if (!shouldProcessDocument(doc)) {
+    if (!isDocumentEnabled(doc)) {
       return;
     }
 
@@ -196,7 +195,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Initial processing for active editor
   const activeEditor = vscode.window.activeTextEditor;
-  if (activeEditor && shouldProcessDocument(activeEditor.document)) {
+  if (activeEditor && isDocumentEnabled(activeEditor.document)) {
     triggerValidation(activeEditor.document);
     updateDecorations(activeEditor);
     updateStatusBar();
@@ -229,39 +228,20 @@ export function deactivate(): void {
  */
 function refreshAllDocuments(): void {
   for (const doc of vscode.workspace.textDocuments) {
-    if (shouldProcessDocument(doc)) {
+    if (isDocumentEnabled(doc)) {
       triggerValidation(doc);
     } else {
       diagnosticCollection.delete(doc.uri);
     }
   }
 
+  // Also clears decorations of newly excluded files
   for (const editor of vscode.window.visibleTextEditors) {
-    if (shouldProcessDocument(editor.document)) {
-      updateDecorations(editor);
-    } else if (isSupportedLanguage(editor.document.languageId)) {
-      clearDecorations(editor);
-    }
+    updateDecorations(editor);
   }
 
   updateStatusBar();
   codeLensProvider.refresh();
-}
-
-/**
- * Check if document should be processed (language supported and not excluded)
- */
-function shouldProcessDocument(doc: vscode.TextDocument): boolean {
-  if (!isSupportedLanguage(doc.languageId)) {
-    return false;
-  }
-
-  const excludePatterns = configManager.exclude;
-  if (excludePatterns.length > 0 && isFileExcluded(doc.uri.fsPath, excludePatterns)) {
-    return false;
-  }
-
-  return true;
 }
 
 async function handleManualFold(): Promise<void> {
@@ -278,7 +258,7 @@ async function handleManualUnfold(): Promise<void> {
   }
 
   const document = editor.document;
-  if (!shouldProcessDocument(document)) {
+  if (!isDocumentEnabled(document)) {
     return;
   }
 
@@ -309,7 +289,7 @@ async function handleToggleFold(block?: SwaggerBlock): Promise<void> {
   }
 
   const document = editor.document;
-  if (!shouldProcessDocument(document)) {
+  if (!isDocumentEnabled(document)) {
     return;
   }
 
@@ -344,7 +324,7 @@ function handleNextBlock(): void {
   }
 
   const document = editor.document;
-  if (!shouldProcessDocument(document)) {
+  if (!isDocumentEnabled(document)) {
     return;
   }
 
@@ -379,7 +359,7 @@ function handlePreviousBlock(): void {
   }
 
   const document = editor.document;
-  if (!shouldProcessDocument(document)) {
+  if (!isDocumentEnabled(document)) {
     return;
   }
 
@@ -492,7 +472,7 @@ async function pickOperation(
 function handleActiveEditorChange(editor: vscode.TextEditor): void {
   const doc = editor.document;
 
-  if (!shouldProcessDocument(doc)) {
+  if (!isDocumentEnabled(doc)) {
     return;
   }
 
@@ -584,7 +564,7 @@ async function foldWhenRangesReady(editor: vscode.TextEditor): Promise<void> {
  * Validates the document and updates diagnostics
  */
 async function triggerValidation(document: vscode.TextDocument): Promise<void> {
-  if (!shouldProcessDocument(document)) {
+  if (!isDocumentEnabled(document)) {
     return;
   }
 
@@ -613,7 +593,7 @@ async function triggerValidation(document: vscode.TextDocument): Promise<void> {
 async function foldSwaggerBlocks(editor: vscode.TextEditor): Promise<void> {
   const document = editor.document;
 
-  if (!shouldProcessDocument(document)) {
+  if (!isDocumentEnabled(document)) {
     return;
   }
 

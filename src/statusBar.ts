@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { findSwaggerBlocks } from './swaggerUtils';
-import { isSupportedLanguage, COMMANDS } from './constants';
+import { isDocumentEnabled, COMMANDS } from './constants';
 
 let statusBarItem: vscode.StatusBarItem;
 
@@ -25,7 +25,7 @@ export function activateStatusBar(context: vscode.ExtensionContext): void {
 export function updateStatusBar(): void {
   const editor = vscode.window.activeTextEditor;
 
-  if (!editor || !isSupportedLanguage(editor.document.languageId)) {
+  if (!editor || !isDocumentEnabled(editor.document)) {
     statusBarItem.hide();
     return;
   }

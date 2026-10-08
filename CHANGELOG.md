@@ -5,6 +5,18 @@ All notable changes to the **JSDoc Swagger SmartFold** extension will be documen
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Preview resolves components from other files**: `$ref`s to schemas (or other components) defined elsewhere in the workspace are now shown in Swagger UI instead of a "Could not resolve reference" error; components found nowhere are shown as "Not found in the workspace"
+
+### Changed
+- **Precise diagnostics**: each OpenAPI error is reported on the line it refers to instead of underlining the whole block, and generic errors that only restate a more specific one (`must match exactly one schema in oneOf`, `must have required property '$ref'`) are no longer listed
+- **Type suggestions**: "Fix invalid types" offers only the intended type for clear typos and abbreviations (`strng`, `obj`, `int`); all types are still offered when there is no clear match
+
+### Fixed
+- `swaggerFold.exclude` now applies to CodeLens, hover, code actions and the status bar too (diagnostics and decorations already honored it)
+
 ## [0.0.8] - 2026-10-02
 
 ### Changed

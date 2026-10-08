@@ -1,6 +1,13 @@
 import * as vscode from 'vscode';
 import * as crypto from 'crypto';
-import { findSwaggerBlocks, mergeBlocksToOpenApi } from './swaggerUtils';
+import {
+  addReferencedComponents,
+  findSwaggerBlocks,
+  hasMissingComponentRefs,
+  mergeBlocksToOpenApi,
+  OpenApiDocument,
+} from './swaggerUtils';
+import { findProjectFiles, readSwaggerYaml } from './projectScanner';
 import { isSupportedLanguage, configManager, isFileExcluded } from './constants';
 
 let previewPanel: vscode.WebviewPanel | undefined;
@@ -78,10 +85,11 @@ export async function showSwaggerPreview(context: vscode.ExtensionContext): Prom
 
   // Merge blocks into OpenAPI spec using shared logic
   const fileName = document.fileName.split(/[\\/]/).pop() ?? 'Untitled';
-  let spec: Record<string, unknown> = mergeBlocksToOpenApi(blocks, fileName);
+  const mergedSpec = mergeBlocksToOpenApi(blocks, fileName);
+  await addComponentsFromProject(mergedSpec, document.uri);
 
   // Sanitize the spec to prevent XSS
-  spec = sanitizeSpec(spec);
+  const spec = sanitizeSpec(mergedSpec);
 
   // Create or reveal panel
   if (previewPanel) {
@@ -105,6 +113,37 @@ export async function showSwaggerPreview(context: vscode.ExtensionContext): Prom
   }
 
   previewPanel.webview.html = getSwaggerUIHtml(previewPanel.webview, context.extensionUri, spec);
+}
+
+/**
+ * Resolves `$ref`s to components defined in other workspace files (the usual
+ * swagger-jsdoc layout), so Swagger UI renders them instead of a resolver
+ * error. Components found nowhere are stubbed with an explanatory note.
+ */
+async function addComponentsFromProject(
+  spec: OpenApiDocument,
+  currentFile: vscode.Uri,
+): Promise<void> {
+  const components = (spec.components ?? {}) as Record<string, Record<string, unknown>>;
+  if (!hasMissingComponentRefs(spec, components)) {
+    return;
+  }
+
+  const otherFiles = (await findProjectFiles()).filter(
+    (file) => file.toString() !== currentFile.toString(),
+  );
+  const projectYaml = await vscode.window.withProgress(
+    { location: vscode.ProgressLocation.Window, title: 'Resolving Swagger references…' },
+    () => readSwaggerYaml(otherFiles),
+  );
+  const projectComponents =
+    mergeBlocksToOpenApi(
+      projectYaml.map((yamlContent) => ({ yamlContent })),
+      '',
+    ).components ?? {};
+
+  addReferencedComponents(spec, components, projectComponents, 'Not found in the workspace');
+  spec.components = components;
 }
 
 /**

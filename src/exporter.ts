@@ -3,22 +3,13 @@ import * as yaml from 'js-yaml';
 import * as path from 'path';
 import {
   findSwaggerBlocks,
-  findSwaggerYamlInText,
   parseYamlContent,
   SwaggerBlock,
   mergeBlocksToOpenApi,
   OpenApiDocument,
 } from './swaggerUtils';
 import { isSupportedLanguage, configManager, isFileExcluded } from './constants';
-
-// Source files scanned by the project export
-const PROJECT_FILES_GLOB = '**/*.{js,ts,jsx,tsx,mjs,cjs,vue,svelte}';
-
-// Dependencies, build output and type declarations: JSDoc comments survive
-// compilation, so scanning these would duplicate every endpoint
-const PROJECT_EXCLUDE_GLOB =
-  '{**/node_modules/**,**/dist/**,**/out/**,**/build/**,**/coverage/**,' +
-  '**/.next/**,**/.nuxt/**,**/.svelte-kit/**,**/*.d.ts,**/*.min.js}';
+import { findProjectFiles, readSwaggerYaml } from './projectScanner';
 
 /**
  * Export all swagger blocks from current file to a single OpenAPI document
@@ -62,48 +53,29 @@ export async function exportProject(): Promise<void> {
     return;
   }
 
-  const excludePatterns = configManager.exclude;
-
-  const files = await vscode.workspace.findFiles(PROJECT_FILES_GLOB, PROJECT_EXCLUDE_GLOB);
-
-  const candidateFiles =
-    excludePatterns.length === 0
-      ? files
-      : files.filter((file) => !isFileExcluded(file.fsPath, excludePatterns));
+  const candidateFiles = await findProjectFiles();
 
   if (candidateFiles.length === 0) {
     vscode.window.showInformationMessage('No supported files found');
     return;
   }
 
-  const allBlocks: Array<Pick<SwaggerBlock, 'yamlContent'>> = [];
-
-  await vscode.window.withProgress(
+  const yamlContents = await vscode.window.withProgress(
     {
       location: vscode.ProgressLocation.Notification,
       title: 'Scanning files for Swagger blocks...',
       cancellable: true,
     },
-    async (progress, token) => {
-      for (let i = 0; i < candidateFiles.length; i++) {
-        if (token.isCancellationRequested) {
-          return;
-        }
-
+    (progress, token) =>
+      readSwaggerYaml(candidateFiles, (i) => {
         progress.report({
           increment: 100 / candidateFiles.length,
           message: `${i + 1}/${candidateFiles.length} files`,
         });
-
-        try {
-          const text = await readFileText(candidateFiles[i]);
-          allBlocks.push(...findSwaggerYamlInText(text).map((yamlContent) => ({ yamlContent })));
-        } catch {
-          // Skip files that can't be read
-        }
-      }
-    },
+        return !token.isCancellationRequested;
+      }),
   );
+  const allBlocks = yamlContents.map((yamlContent) => ({ yamlContent }));
 
   if (allBlocks.length === 0) {
     vscode.window.showInformationMessage('No Swagger blocks found in project');
@@ -113,21 +85,6 @@ export async function exportProject(): Promise<void> {
   const projectName = workspaceFolders[0].name;
   const openApiDoc = mergeBlocksToOpenApi(allBlocks, projectName);
   await saveOpenApiDocument(openApiDoc, workspaceFolders[0].uri.fsPath);
-}
-
-/**
- * Reads a file's text, preferring the open (possibly unsaved) editor contents.
- * Avoids openTextDocument, which would fire open events (and validation) for
- * every file in the project.
- */
-async function readFileText(uri: vscode.Uri): Promise<string> {
-  const openDocument = vscode.workspace.textDocuments.find(
-    (doc) => doc.uri.toString() === uri.toString(),
-  );
-  if (openDocument) {
-    return openDocument.getText();
-  }
-  return new TextDecoder('utf-8').decode(await vscode.workspace.fs.readFile(uri));
 }
 
 /**
