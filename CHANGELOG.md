@@ -5,7 +5,7 @@ All notable changes to the **JSDoc Swagger SmartFold** extension will be documen
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.0.9] - 2026-10-08
 
 ### Added
 - **Preview resolves components from other files**: `$ref`s to schemas (or other components) defined elsewhere in the workspace are now shown in Swagger UI instead of a "Could not resolve reference" error; components found nowhere are shown as "Not found in the workspace"
@@ -149,6 +149,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+[0.0.9]: https://github.com/maxicuyo94/jsdoc-swagger-smartfold/compare/v0.0.8...v0.0.9
 [0.0.8]: https://github.com/maxicuyo94/jsdoc-swagger-smartfold/compare/v0.0.7...v0.0.8
 [0.0.7]: https://github.com/maxicuyo94/jsdoc-swagger-smartfold/compare/v0.0.6...v0.0.7
 [0.0.6]: https://github.com/maxicuyo94/jsdoc-swagger-smartfold/compare/v0.0.5...v0.0.6
