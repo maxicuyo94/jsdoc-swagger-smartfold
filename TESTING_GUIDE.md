@@ -57,7 +57,7 @@ Para probar la extensión "en producción" o compartirla con compañeros sin pub
 ### Pasos para empaquetar e instalar:
 1.  En la terminal de la carpeta raíz del proyecto, ejecuta:
     ```bash
-    npx vsce package
+    npm run package
     ```
     *   Esto generará un archivo `.vsix` (ej. `jsdoc-swagger-smartfold-0.0.1.vsix`).
 

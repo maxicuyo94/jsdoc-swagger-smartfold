@@ -424,3 +424,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Enjoy writing documented APIs!**
+
+## Local verification — 2026-10-25
+
+From the repository root, run `npm ci`, `npm run compile`, `npm run lint`, then `npm test`. The test runner uses a mocked VS Code API; it does not replace an Extension Development Host check. See the [testing guide](TESTING_GUIDE.md) for manual folding, diagnostics and preview checks. Use `npm run package` to build a local VSIX; publishing is a separate action.
+
+This documentation review inspected the scripts without running them or checking either marketplace. A pre-existing local change to `package.json` was preserved. Next step: record automated results and a manual VS Code check against the same revision before packaging a release.
