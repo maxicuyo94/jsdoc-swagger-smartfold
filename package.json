@@ -265,5 +265,10 @@
     "js-yaml": "^4.1.0",
     "minimatch": "^10.2.6",
     "swagger-ui-dist": "^5.30.3"
+  },
+  "allowScripts": {
+    "@vscode/vsce-sign@2.0.9": true,
+    "esbuild@0.27.0": true,
+    "keytar@7.9.0": true
   }
 }
